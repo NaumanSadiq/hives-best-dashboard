@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class Operations
@@ -84,7 +85,7 @@ class Operations
                         continue;
                     }
                     DB::table('allocations')->insert(['order_item_id' => $itemId, 'batch_id' => $batch->id, 'quantity' => $take]);
-                    DB::table('batches')->where('id', $batch->id)->increment('reserved', $take);
+                    DB::table('batches')->where('id', $batch->id)->increment('reserved', $take, ['used_at' => $batch->used_at ?? now()]);
                     $remaining -= $take;
                     if ($remaining === 0) {
                         break;
@@ -95,13 +96,15 @@ class Operations
                 }
             }
 
+            $this->event($id, $old ? 'Order edited' : 'Order created', $values['ordered_on'], 'Reserved stock: '.$this->allocations($id)->map(fn ($a) => $a->reference.': '.number_format($a->quantity).' '.($a->kind === 'honey' ? 'g' : 'units'))->implode('; '));
+
             return $id;
         });
     }
 
     public function allocations(int $id)
     {
-        return DB::table('allocations as a')->join('order_items as i', 'i.id', '=', 'a.order_item_id')->join('batches as b', 'b.id', '=', 'a.batch_id')->where('i.order_id', $id)->select('a.*', 'b.reference', 'i.name', 'i.quantity as packs', 'i.pack_quantity', 'i.unit_price')->orderBy('a.id')->get();
+        return DB::table('allocations as a')->join('order_items as i', 'i.id', '=', 'a.order_item_id')->join('products as p', 'p.id', '=', 'i.product_id')->join('batches as b', 'b.id', '=', 'a.batch_id')->where('i.order_id', $id)->select('a.*', 'b.reference', 'i.name', 'i.quantity as packs', 'i.pack_quantity', 'i.unit_price', 'p.kind')->orderBy('a.id')->get();
     }
 
     public function transition(int $id, string $status, string $date): void
@@ -157,6 +160,7 @@ class Operations
                 $values['delivered_on'] = $date;
             }
             DB::table('orders')->where('id', $id)->update($values);
+            $this->event($id, $status, $date, $status === 'Cancelled' && $order->status === 'Pending' ? 'Current pending reservations released once.' : null);
         });
     }
 
@@ -178,6 +182,7 @@ class Operations
                 DB::table('allocations')->where('id', $a->id)->update(['returned' => true]);
             }
             DB::table('orders')->where('id', $id)->update(['returned_at' => now()]);
+            $this->event($id, 'Stock returned', today()->toDateString(), 'Confirmed physical return to allocated batches.');
         });
     }
 
@@ -220,6 +225,7 @@ class Operations
                 $this->fail('Adjustment must preserve reservations and cannot exceed original quantity less net dispatched stock. Receive a new batch for new purchases.');
             }
             DB::table('batches')->where('id', $batchId)->increment('physical', $quantity);
+            DB::table('batches')->where('id', $batchId)->update(['used_at' => $b->used_at ?? now()]);
             DB::table('stock_adjustments')->insert(['batch_id' => $batchId, 'quantity' => $quantity, 'reason' => $reason, 'created_at' => now(), 'updated_at' => now()]);
         });
     }
@@ -241,6 +247,48 @@ class Operations
             $snapshot['order'] = array_intersect_key((array) $order, array_flip(['number', 'customer', 'phone', 'address', 'ordered_on', 'subtotal', 'discount', 'delivery', 'total', 'status']));
 
             return DB::table('invoices')->insertGetId(['order_id' => $id, 'version' => $version, 'number' => $order->number.'-I'.$version, 'snapshot' => json_encode($snapshot), 'created_at' => now(), 'updated_at' => now()]);
+        });
+    }
+
+    private function event(int $id, string $action, string $date, ?string $details = null): void
+    {
+        DB::table('order_events')->insert(['order_id' => $id, 'action' => $action, 'business_date' => $date, 'details' => $details, 'created_at' => now()]);
+    }
+
+    public function batchUsed(int $id): bool
+    {
+        $b = DB::table('batches')->find($id);
+
+        return $b && ($b->used_at || $b->reserved || $b->physical !== $b->original_quantity || DB::table('allocations')->where('batch_id', $id)->exists() || DB::table('stock_adjustments')->where('batch_id', $id)->exists());
+    }
+
+    public function editBatch(int $id, array $data, string $reason): void
+    {
+        $this->transaction(function () use ($id, $data, $reason) {
+            $b = DB::table('batches')->lockForUpdate()->find($id);
+            if (! $b) {
+                $this->fail('Batch not found.');
+            }
+            try {
+                $data = validator($data, ['reference' => ['required', 'string', 'max:100', Rule::unique('batches', 'reference')->ignore($id)], 'stock_key' => 'required|exists:products,stock_key', 'received_on' => 'required|date_format:Y-m-d|before_or_equal:today', 'original_quantity' => 'required|integer|min:1|max:100000000', 'purchase' => 'required|regex:/^\d{1,9}(\.\d{1,2})?$/', 'packaging' => 'required|regex:/^\d{1,9}(\.\d{1,2})?$/', 'branding' => 'required|regex:/^\d{1,9}(\.\d{1,2})?$/', 'other' => 'required|regex:/^\d{1,9}(\.\d{1,2})?$/'])->validate();
+            } catch (ValidationException $e) {
+                throw ValidationException::withMessages(collect($e->errors())->mapWithKeys(fn ($messages, $field) => ['batch.'.$field => $messages])->all());
+            }
+            validator(['reason' => $reason], ['reason' => 'required|string|min:5|max:2000'])->validate();
+            foreach (['purchase', 'packaging', 'branding', 'other'] as $field) {
+                $data[$field] = Money::parse($data[$field]);
+            }
+            if ($this->batchUsed($id)) {
+                foreach (['stock_key', 'received_on', 'original_quantity', 'purchase', 'packaging', 'branding', 'other'] as $field) {
+                    if ((string) $data[$field] !== (string) $b->$field) {
+                        throw ValidationException::withMessages(['batch.'.$field => 'This batch has inventory history. Its pool, received date, original quantity and cost basis are locked; use a documented stock adjustment for physical corrections.']);
+                    }
+                }
+            } else {
+                $data['physical'] = (int) $data['original_quantity'];
+            }
+            DB::table('batches')->where('id', $id)->update($data + ['updated_at' => now()]);
+            DB::table('batch_changes')->insert(['batch_id' => $id, 'user_id' => auth()->id(), 'kind' => 'edit', 'reason' => $reason, 'before' => json_encode($b), 'after' => json_encode(DB::table('batches')->find($id)), 'created_at' => now()]);
         });
     }
 }

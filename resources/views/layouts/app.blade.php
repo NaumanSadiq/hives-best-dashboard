@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>{{ ucfirst($page ?? 'Dashboard') }} · Hive’s Best</title>@vite(['resources/css/app.css','resources/js/app.js']) @livewireStyles</head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><x-favicon /><title>{{ ucfirst($page ?? 'Dashboard') }} · Hive’s Best</title>@vite(['resources/css/app.css','resources/js/app.js']) @livewireStyles</head>
 <body>
 <div class="app-frame">
     <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Main navigation">

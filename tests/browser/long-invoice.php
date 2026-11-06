@@ -1,10 +1,11 @@
 <?php
-require dirname(__DIR__,2).'/vendor/autoload.php';
-$app=require dirname(__DIR__,2).'/bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Services\Operations;
+
+require dirname(__DIR__,2).'/vendor/autoload.php';
+$app=require dirname(__DIR__,2).'/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 config(['database.connections.mysql.database'=>'hives_best_qa']); DB::purge('mysql');
 $key='long-invoice-'.Str::lower(Str::random(8));
 $product=DB::table('products')->insertGetId(['name'=>'Wholesome roasted almond snack pack · a carefully prepared and naturally delicious selection','stock_key'=>$key,'kind'=>'snack','pack_quantity'=>1,'price'=>10000,'low_stock'=>2]);

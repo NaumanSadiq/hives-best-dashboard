@@ -1,4 +1,5 @@
 import * as bootstrap from 'bootstrap';
+import './controls';
 import { toBlob } from 'html-to-image';
 window.bootstrap = bootstrap;
 window.hiveDialog = () => ({
@@ -6,6 +7,7 @@ window.hiveDialog = () => ({
     init() { this.previous = document.activeElement; document.body.style.overflow = 'hidden'; this.$nextTick(() => this.$el.focus()); },
     destroy() { document.body.style.overflow = ''; this.previous?.focus(); },
     trap(event) {
+        if (this.$el.hasAttribute('data-picker-open')) return;
         const controls = [...this.$el.querySelectorAll('button,a[href],input,select,textarea,[tabindex="0"]')].filter(el => !el.disabled && el.offsetParent !== null);
         const first = controls[0], last = controls.at(-1);
         if (event.shiftKey && (document.activeElement === first || document.activeElement === this.$el)) { event.preventDefault(); last?.focus(); }

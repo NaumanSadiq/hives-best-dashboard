@@ -1,4 +1,9 @@
 <?php
+use App\Services\Operations;
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 // Real row-lock integration probe. This script can only connect to the disposable QA database.
 require dirname(__DIR__, 2).'/vendor/autoload.php';
@@ -6,11 +11,6 @@ $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 config(['database.connections.mysql.database' => 'hives_best_qa']);
 DB::purge('mysql');
-use App\Services\Operations;
-use Illuminate\Contracts\Console\Kernel;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 if (($argv[1] ?? '') === 'prepare') {
     $pool = 'concurrency-'.Str::lower(Str::random(8));

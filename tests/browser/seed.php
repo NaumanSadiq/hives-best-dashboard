@@ -1,16 +1,16 @@
 <?php
-
-// Disposable MariaDB QA data; never seeds the business database.
-$root = dirname(__DIR__, 2);
-require $root.'/vendor/autoload.php';
-$app = require $root.'/bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
 use App\Models\User;
 use App\Services\Operations;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+
+// Disposable MariaDB QA data; never seeds the business database.
+$root = dirname(__DIR__, 2);
+require $root.'/vendor/autoload.php';
+$app = require $root.'/bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
 
 DB::statement('CREATE DATABASE IF NOT EXISTS hives_best_qa CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 config(['database.connections.mysql.database' => 'hives_best_qa']);
