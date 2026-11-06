@@ -1,0 +1,54 @@
+<div>
+@php($money = fn($v) => \App\Support\Money::format($v))
+<header class="topbar"><div class="d-flex align-items-center gap-3"><button class="btn icon-button d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-label="Open menu"><i aria-hidden="true" class="bi bi-list"></i></button><h1>{{ ucfirst($page) }}</h1></div><label class="search-pill"><i aria-hidden="true" class="bi bi-search"></i><input aria-label="Search orders by number or customer" wire:model.live.debounce.350ms="search" placeholder="Search orders, customers..."></label><a class="icon-button notification" href="{{ route('orders') }}" aria-label="{{ $dispatchCount }} orders awaiting dispatch"><i aria-hidden="true" class="bi bi-bell-fill"></i>@if($dispatchCount)<span>{{ $dispatchCount }}</span>@endif</a><a class="icon-button avatar" href="{{ route('dashboard') }}" aria-label="Admin dashboard"><i aria-hidden="true" class="bi bi-person-fill"></i></a></header>
+<div wire:loading.delay class="loading-pill" role="status"><span class="spinner-border spinner-border-sm"></span> Updating your hive…</div>
+@if($notice)<div class="alert alert-success d-flex justify-content-between" role="status">{{ $notice }}<button class="btn-close" aria-label="Dismiss notification" wire:click="$set('notice','')"></button></div>@endif
+@if($errors->any())<div class="alert alert-danger" role="alert"><strong>Please check these details.</strong><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+
+@if($page==='dashboard')
+<section class="hero"><img src="{{ asset('images/honey-hero.png') }}" alt="Clay honey jar, honey dipper and little bee"><div class="hero-copy"><div class="eyebrow">A FRESH DAY AT THE HIVE</div><h2>{{ now()->hour < 12 ? 'Good morning' : 'Hello' }}, {{ Str::before(auth()->user()->name,' ') }}! <span>☀</span></h2><p>A little sweetness.<br>A beautifully organised business.</p><button class="btn btn-peach" wire:click="newOrder"><i aria-hidden="true" class="bi bi-plus-lg"></i> New Order</button></div></section>
+@endif
+
+<div class="section-toolbar"><div><span class="eyebrow">{{ $page==='stock' ? 'MAKE ROOM FOR GOODNESS' : 'YOUR BUSINESS AT A GLANCE' }}</span><p class="small muted mb-0">{{ $page==='stock' ? 'Honey in grams. Snacks in whole units.' : 'Business dates in Asia/Karachi · All amounts in PKR' }}</p></div><form class="date-filter" wire:submit="filter"><label><span class="visually-hidden">From date</span><input type="date" wire:model="from" required></label><span>to</span><label><span class="visually-hidden">To date</span><input type="date" wire:model="to" required></label><button class="btn btn-sm" type="submit" aria-label="Apply date range"><i aria-hidden="true" class="bi bi-arrow-right"></i></button></form></div>
+
+@if(in_array($page,['dashboard','reports']))
+<section class="kpi-grid" aria-label="Business metrics">
+@foreach([['sage','bag-heart-fill','Orders',$summary['orders'],'Placed in selected period'],['peach','heart-fill','Sales Revenue',$money($summary['revenue']),'Delivered in selected period'],['honey','clock-fill','Payments Pending',$money($summary['pending']),'All active orders · current balance'],['blue','graph-up-arrow','Gross Profit',$money($summary['profit']),'Delivered revenue − stock − courier']] as [$color,$icon,$label,$value,$detail])
+<article class="kpi {{ $color }}"><span class="clay-icon {{ $color }}"><i aria-hidden="true" class="bi bi-{{ $icon }}"></i></span><h2>{{ $label }}</h2><strong class="{{ is_string($value)?'money-value':'' }}">{{ $value }}</strong><p>{{ $detail }}</p></article>
+@endforeach
+</section>
+@endif
+
+@if($page==='dashboard')
+<div class="dashboard-grid charts-grid"><section class="panel"><div class="panel-heading"><h2>Revenue Overview</h2><span class="mini-pill">By delivery date</span></div><p class="small muted">Delivered sales, including billed delivery</p>
+@if($bars->count())<div class="bar-chart" role="img" aria-label="Revenue by delivery date"><div class="chart-scale"><span>{{ $money($bars->max('revenue')) }}</span><span>0</span></div><div class="bar-scroll">@foreach($bars as $bar)<div class="bar-column"><span class="bar-bar" style="height:{{ max(3, $bar->revenue / max(1,$bars->max('revenue')) * 136) }}px" title="{{ $bar->delivered_on }}: {{ $money($bar->revenue) }}"></span><span>{{ \Carbon\Carbon::parse($bar->delivered_on)->format('d M') }}</span><span class="bar-amount">{{ $money($bar->revenue) }}</span></div>@endforeach</div></div>
+@else<div class="chart-empty"><i aria-hidden="true" class="bi bi-bar-chart-line"></i><strong>Good things are growing.</strong><span>Delivered orders will bring this chart to life.</span></div>@endif</section>
+<section class="panel"><div class="panel-heading"><h2>Order Status</h2><span class="mini-pill">By order date</span></div>
+@php($statusColors=['Pending'=>'#f5bc74','Dispatched'=>'#a7c2cb','Delivered'=>'#9eb8a2','Cancelled'=>'#edaa95'])
+@php($totalStatus=max(1,$statuses->sum()))
+@php($cursor=0)
+@php($segments=[])
+@foreach($statusColors as $s=>$color) @php($end=$cursor+($statuses[$s]??0)/$totalStatus*100) @php($segments[]="$color {$cursor}% {$end}%") @php($cursor=$end) @endforeach
+<div class="status-chart"><div class="donut" style="background:{{ $statuses->sum() ? 'conic-gradient('.implode(',',$segments).')' : '#e6dfce' }}" role="img" aria-label="{{ $statuses->sum() }} orders by status"><div><strong>{{ $statuses->sum() }}</strong><span>orders</span></div></div><div class="chart-legend">@foreach($statusColors as $s=>$color)<div><span class="legend-dot" style="background:{{ $color }}"></span><span>{{ $s }}</span><strong>{{ $statuses[$s]??0 }}</strong></div>@endforeach</div></div></section></div>
+@endif
+
+@if(in_array($page,['dashboard','orders']))
+<div class="{{ $page==='dashboard'?'dashboard-grid lower-grid':'' }}"><section class="panel orders-panel"><div class="panel-heading"><h2>{{ $page==='dashboard'?'Recent Orders':'Orders' }}</h2>@if($page==='dashboard')<a class="mini-pill" href="{{ route('orders') }}">See all <i aria-hidden="true" class="bi bi-arrow-up-right"></i></a>@else<button class="btn btn-peach btn-sm" wire:click="newOrder"><i aria-hidden="true" class="bi bi-plus-lg"></i> New Order</button>@endif</div>
+@if($page==='orders' || $search)<div class="row g-2 mb-3"><div class="col-sm-6"><select class="form-select" wire:model.live="status" aria-label="Filter fulfilment"><option value="">All fulfilment</option>@foreach(['Pending','Dispatched','Delivered','Cancelled'] as $s)<option>{{ $s }}</option>@endforeach</select></div><div class="col-sm-6"><select class="form-select" wire:model.live="paymentFilter" aria-label="Filter payment"><option value="">All payments</option><option>Pending</option><option>Paid</option></select></div></div>@endif
+@forelse($orders as $o)<button class="order-row" wire:click="viewOrder({{ $o->id }})"><span class="order-thumb"><i aria-hidden="true" class="bi bi-bag-heart-fill"></i></span><span class="order-person"><strong>{{ $o->customer }}</strong><small>{{ $o->number }} · {{ $o->ordered_on }}</small></span><span class="order-value"><strong>{{ $money($o->total) }}</strong><span class="status-badge status-{{ strtolower($o->status) }}">{{ $o->status }}</span><small>{{ $o->status==='Cancelled' ? ($o->paid>0?'Refund due':'Cancelled') : ($o->paid >= $o->total?'Paid':'Payment pending') }}</small></span><i aria-hidden="true" class="bi bi-chevron-right"></i></button>@empty<div class="empty-state"><i aria-hidden="true" class="bi bi-bag-heart"></i><strong>{{ $search?'No matching orders':'Your next sweet beginning.' }}</strong><p>{{ $search?'Try another order number or customer.':'Create an order after receiving your first stock batch.' }}</p><button class="btn btn-peach btn-sm" wire:click="newOrder">Create an order</button></div>@endforelse
+{{ $orders->links() }}</section>
+@if($page==='dashboard')<section class="panel stock-feature"><div class="panel-heading"><h2>Stock Overview</h2><a class="mini-pill" href="{{ route('stock') }}">See all <i aria-hidden="true" class="bi bi-arrow-up-right"></i></a></div><a class="stock-illustration" href="{{ route('stock') }}"><img src="{{ asset('images/honey-hero.png') }}" alt="Honey jars and natural goodness"><div><strong>Goodness in store</strong><span>{{ $products->count() }} products · {{ $batches->total() }} batches</span></div><span class="round-arrow"><i aria-hidden="true" class="bi bi-arrow-right"></i></span></a></section>@endif</div>
+@endif
+
+@if($page==='stock') @include('partials.stock') @endif
+@if($page==='reports') @include('partials.reports') @endif
+
+@if($page==='dashboard')<a class="bottom-banner" href="{{ route($dispatchCount ? 'orders' : 'stock') }}"><span class="banner-flower">✿</span><span><strong>{{ $dispatchCount ? $dispatchCount.' orders ready for your care' : 'A happy hive starts here' }}</strong><small>{{ $dispatchCount ? 'Pack with love. Send a little sweetness.' : 'Receive stock, add products, and create your first order.' }}</small></span><span class="btn btn-sage">{{ $dispatchCount?'Review orders':'Explore stock' }} <i aria-hidden="true" class="bi bi-arrow-right"></i></span></a>@endif
+
+@if($form || $selectedOrder)<div class="modal-backdrop show"></div><div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="dialog-title" x-data="hiveDialog" x-on:keydown.tab="trap($event)" x-on:keydown.escape="$wire.closeDialog()" wire:key="dialog-{{ $form }}-{{ $selected }}"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h2 class="modal-title h4" id="dialog-title">{{ $selectedOrder ? $selectedOrder->number : ['order'=>($editing?'Edit Order':'New Order'),'product'=>'Product','batch'=>'Receive Stock'][$form] }}</h2><button class="btn-close" aria-label="Close dialog" wire:click="closeDialog"></button></div><div class="modal-body">
+@if($errors->any())<div class="alert alert-danger" role="alert">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>@endif
+@if($form==='order') @include('partials.order-form') @endif
+@if($form==='product' || $form==='batch') @include('partials.stock-form') @endif
+@if($selectedOrder) @include('partials.order-detail') @endif
+</div></div></div></div>@endif
+</div>

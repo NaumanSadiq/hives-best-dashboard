@@ -1,0 +1,20 @@
+import { chromium } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import assert from 'node:assert/strict';
+const fixture=await new Promise((resolve,reject)=> {const p=spawn('php',['tests/browser/long-invoice.php'],{windowsHide:true});let text='',errors='';p.stdout.on('data',d=>text+=d);p.stderr.on('data',d=>errors+=d);p.on('close',code=>code?reject(new Error(errors)):resolve(JSON.parse(text)));});
+const login=JSON.parse(await readFile('storage/qa-login.json','utf8'));
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const context=await browser.newContext({viewport:{width:1440,height:1100}});
+const page=await context.newPage(); const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://127.0.0.1:8010/login'); await page.getByLabel('Admin email').fill(login.email); await page.getByLabel('Password',{exact:true}).fill(login.password); await page.getByRole('button',{name:/Sign in/}).click(); await page.waitForURL('http://127.0.0.1:8010/');
+for(const width of [320,390,1440]) {await page.setViewportSize({width,height:1000});for(const path of ['/','/orders','/stock','/reports']) {await page.goto('http://127.0.0.1:8010'+path);const bounds=await page.evaluate(()=>[document.documentElement.scrollWidth,innerWidth]);assert(bounds[0]<=bounds[1],`Overflow ${path} at ${width}: ${bounds}`);}}
+await page.goto('http://127.0.0.1:8010/invoices/'+fixture.invoice);
+await page.waitForFunction(()=>document.querySelector('#invoice-status')?.textContent.startsWith('PNG ready'),{},{timeout:60000});
+assert.equal(await page.locator('.invoice-table tbody tr').count(),50);
+assert(!(await page.locator('#invoice-sheet').innerText()).includes('Never show these private notes'));
+const downloadPromise=page.waitForEvent('download');await page.getByRole('link',{name:'Download PNG'}).click();await (await downloadPromise).saveAs('storage/app/qa/invoice-long.png');
+const png=await readFile('storage/app/qa/invoice-long.png');assert.equal(png.readUInt32BE(16),1600);assert(png.readUInt32BE(20)>5000);
+await page.goto('http://127.0.0.1:8010/'); await page.locator('.hero img').evaluate(img=>img.decode()); await page.screenshot({path:'storage/app/qa/dashboard-final-desktop.png',fullPage:true});
+await page.setViewportSize({width:390,height:844});await page.screenshot({path:'storage/app/qa/dashboard-final-mobile.png',fullPage:true});
+assert.deepEqual(errors,[]); console.log(JSON.stringify({result:'passed',responsiveWidths:[320,390,1440],longInvoiceRows:50,pngWidth:png.readUInt32BE(16),pngHeight:png.readUInt32BE(20),consoleErrors:errors.length}));await browser.close();

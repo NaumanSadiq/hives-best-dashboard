@@ -1,0 +1,119 @@
+import { chromium } from '@playwright/test';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+
+const base = process.env.QA_URL || 'http://127.0.0.1:8010';
+assert(base.includes('127.0.0.1:8010'), 'Browser QA must use the disposable QA server.');
+const credentials = JSON.parse(await readFile('storage/qa-login.json', 'utf8'));
+await mkdir('storage/app/qa', { recursive: true });
+const browser = await chromium.launch({ channel: process.env.QA_BROWSER || 'chrome', headless: true });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1150 }, permissions: ['clipboard-read', 'clipboard-write'] });
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+async function login() {
+    await page.goto(base + '/login');
+    await page.getByLabel('Admin email').fill(credentials.email);
+    await page.getByLabel('Password', { exact: true }).fill(credentials.password);
+    await page.getByRole('button', { name: /Sign in/ }).click();
+    await page.waitForURL(base + '/');
+    await page.locator('.hero img').evaluate(img => img.decode());
+}
+async function noOverflow(label) {
+    const sizes = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
+    assert(sizes[0] <= sizes[1], `${label} overflows: ${sizes}`);
+}
+await login();
+await noOverflow('Desktop dashboard');
+await page.screenshot({ path: 'storage/app/qa/dashboard-desktop.png', fullPage: true });
+await page.goto(base + '/stock');
+await page.getByRole('button', { name: 'Receive stock', exact: true }).click();
+await page.getByRole('dialog').getByLabel('Stock pool', { exact: true }).selectOption('sidr');
+await page.getByRole('dialog').getByLabel('Unique batch reference').fill('QA-BROWSER-' + Date.now());
+await page.getByRole('dialog').getByLabel('Original sellable quantity (grams or units)').fill('10000');
+for (const [id, value] of [['purchase','10000'], ['packaging','1000'], ['branding','500'], ['other','500']]) await page.locator('#batch-' + id).fill(value);
+await page.getByRole('dialog').getByRole('button', {name:'Receive batch',exact:true}).click();
+await page.getByText('Batch received and available for orders.',{exact:true}).waitFor();
+await page.goto(base + '/orders');
+await page.screenshot({ path: 'storage/app/qa/orders-before-flow.png', fullPage: true });
+await page.getByRole('button', { name: 'New Order', exact: true }).click();
+const dialog = page.getByRole('dialog');
+await dialog.getByLabel('Customer name').fill('Browser QA ' + Date.now());
+await dialog.getByLabel('Phone', { exact: true }).fill('03000000000');
+await dialog.getByLabel('Delivery address').fill('Disposable browser QA address, Karachi');
+console.log(JSON.stringify({productOptions:await dialog.locator('#product-0 option').allTextContents()}));
+await dialog.locator('#product-0').selectOption(await dialog.locator('#product-0 option').filter({hasText:/Sidr Honey.*500/}).getAttribute('value'));
+await dialog.locator('#price-0').waitFor();
+await page.waitForFunction(() => document.querySelector('#price-0')?.value === '1200.00');
+await dialog.getByRole('button', { name: 'Add item' }).click();
+await dialog.locator('#product-1').selectOption(await dialog.locator('#product-1 option').filter({hasText:/Sidr Honey.*1 kg/}).getAttribute('value'));
+await page.waitForFunction(() => document.querySelector('#price-1')?.value === '2200.00');
+await dialog.getByLabel('Discount (PKR)', { exact: true }).fill('100');
+await dialog.getByLabel('Delivery billed (PKR)').fill('200');
+await dialog.getByLabel('Actual courier cost (PKR)').fill('150');
+await dialog.getByRole('button', { name: 'Save & reserve stock' }).click();
+await dialog.getByRole('heading', { name: 'Batch allocation' }).waitFor();
+await dialog.getByLabel('Amount (PKR)', { exact: true }).fill('1000');
+await dialog.getByRole('button', { name: 'Record payment', exact: true }).click();
+await dialog.getByText('Receipt · PKR 1,000.00', { exact: true }).waitFor();
+await dialog.getByRole('button', { name: 'Dispatch order', exact: true }).click();
+await dialog.getByRole('button', { name: 'Mark delivered', exact: true }).waitFor();
+await dialog.getByRole('button', { name: 'Mark delivered', exact: true }).click();
+await dialog.locator('.status-delivered').waitFor();
+await dialog.getByLabel('Amount (PKR)', { exact: true }).fill('2500');
+await dialog.getByRole('button', { name: 'Record payment', exact: true }).click();
+await dialog.getByText('Receipt · PKR 2,500.00', { exact: true }).waitFor();
+await dialog.getByRole('button', { name: 'Issue & View Invoice', exact: true }).click();
+await page.waitForURL(/\/invoices\/\d+$/);
+const invoiceUrl = page.url();
+await page.waitForFunction(() => document.querySelector('#invoice-status')?.textContent.startsWith('PNG ready'));
+await page.screenshot({ path: 'storage/app/qa/invoice-desktop.png', fullPage: true });
+await page.getByRole('button', { name: 'Copy Invoice Image' }).click();
+await page.getByText('Invoice image copied. You can now paste it into a supported chat.', { exact: true }).waitFor();
+const clipboard = await page.evaluate(async () => {
+    const items = await navigator.clipboard.read();
+    const blob = await items[0].getType('image/png');
+    return { type: blob.type, size: blob.size, signature: [...new Uint8Array(await blob.slice(0, 8).arrayBuffer())] };
+});
+assert.equal(clipboard.type, 'image/png'); assert(clipboard.size > 10000);
+assert.deepEqual(clipboard.signature, [137, 80, 78, 71, 13, 10, 26, 10]);
+// Paste through a real browser key event into a local, disposable receiver.
+await page.evaluate(() => {
+    const receiver = document.createElement('div'); receiver.id = 'qa-paste'; receiver.contentEditable = 'true';
+    receiver.setAttribute('aria-label', 'Disposable clipboard paste target');
+    receiver.style.cssText = 'height:70px;background:white;border:1px solid green';
+    receiver.addEventListener('paste', async event => { const image = [...event.clipboardData.items].find(i => i.type === 'image/png'); if(image) receiver.dataset.pngSize = String(image.getAsFile().size); });
+    document.body.prepend(receiver);
+});
+await page.locator('#qa-paste').focus(); await page.keyboard.press('Control+V');
+await page.waitForFunction(() => Number(document.querySelector('#qa-paste')?.dataset.pngSize) > 10000);
+await page.locator('#qa-paste').evaluate(el => el.remove());
+const downloadEvent = page.waitForEvent('download');
+await page.getByRole('link', { name: 'Download PNG' }).click();
+const download = await downloadEvent;
+await download.saveAs('storage/app/qa/invoice.png');
+const png = await readFile('storage/app/qa/invoice.png'); assert.equal(png.readUInt32BE(16), 1600); assert(png.readUInt32BE(20) >= 1920);
+// Confirm the download fallback when image clipboard access is denied.
+await context.clearPermissions(); await page.goto(invoiceUrl);
+await page.waitForFunction(() => document.querySelector('#invoice-status')?.textContent.startsWith('PNG ready'));
+const fallbackDownload = page.waitForEvent('download'); await page.getByRole('link', { name: 'Download PNG' }).click(); await (await fallbackDownload).saveAs('storage/app/qa/invoice-fallback.png');
+for (const path of ['/', '/orders', '/stock', '/reports']) {
+    await page.setViewportSize({ width: 390, height: 844 }); await page.goto(base + path); await noOverflow('Mobile ' + path);
+    await page.screenshot({ path: 'storage/app/qa/mobile-' + (path.slice(1) || 'dashboard') + '.png', fullPage: true });
+}
+await page.goto(base + '/');
+await page.getByRole('button', { name: 'Open menu' }).click();
+await page.locator('#sidebar.show').waitFor();
+await page.getByRole('button', { name: 'Close menu' }).click();
+await page.locator('#sidebar.show').waitFor({ state: 'hidden' });
+await page.getByRole('button', { name: 'New Order', exact: true }).click(); await dialog.waitFor();
+await page.waitForFunction(() => !!document.activeElement.closest('[role="dialog"]'));
+await noOverflow('Mobile order form');
+await page.keyboard.press('Tab');
+console.log(JSON.stringify({modalFocus:await page.evaluate(()=>({tag:document.activeElement.tagName, id:document.activeElement.id, inside:!!document.activeElement.closest('[role="dialog"]')}))}));
+assert(await page.evaluate(() => !!document.activeElement.closest('[role="dialog"]')));
+await page.keyboard.press('Escape'); await page.getByRole('dialog').waitFor({ state: 'hidden' });
+await page.setViewportSize({ width: 390, height: 844 }); await page.goto(invoiceUrl); await noOverflow('Mobile invoice');
+assert.deepEqual(errors, []);
+console.log(JSON.stringify({ browser: process.env.QA_BROWSER || 'chrome', result: 'passed', flow: 'receive fixture → reserve 500g + 1kg → partial payment → dispatch → deliver → settle → invoice PNG → clipboard paste → download fallback', clipboard, pngWidth: png.readUInt32BE(16), pngHeight: png.readUInt32BE(20), desktop: '1440x1150', mobile: '390x844', consoleErrors: errors.length }));
+await browser.close();
