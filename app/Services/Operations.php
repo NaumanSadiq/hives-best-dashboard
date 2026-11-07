@@ -75,7 +75,7 @@ class Operations
                 $id = DB::table('orders')->insertGetId($values + ['request_key' => $key, 'number' => 'HB-'.now()->format('ymd').'-'.Str::upper(Str::random(8)), 'created_at' => now()]);
             }
             foreach ($items as [$product, $price, $quantity]) {
-                $itemId = DB::table('order_items')->insertGetId(['order_id' => $id, 'product_id' => $product->id, 'name' => $product->name, 'quantity' => $quantity, 'pack_quantity' => $product->pack_quantity, 'unit_price' => $price]);
+                $itemId = DB::table('order_items')->insertGetId(['order_id' => $id, 'product_id' => $product->id, 'kind' => $product->kind, 'name' => $product->name, 'quantity' => $quantity, 'pack_quantity' => $product->pack_quantity, 'unit_price' => $price]);
                 $remaining = $quantity * $product->pack_quantity;
                 $batches = DB::table('batches')->where('stock_key', $product->stock_key)->orderBy('received_on')->orderBy('id')->lockForUpdate()->get();
                 foreach ($batches as $batch) {

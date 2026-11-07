@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Services\BatchCorrections;
 use App\Services\Operations;
+use App\Services\PaymentCorrections;
 use App\Services\Reports;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,21 @@ class Admin extends Component
     protected $paginationTheme = 'bootstrap';
 
     public string $page = 'dashboard';
+
+    public string $breakdownKind = 'cash';
+
+    #[Locked]
+    public ?int $editingPayment = null;
+
+    #[Locked]
+    public string $correctionKey = '';
+
+    #[Locked]
+    public array $paymentPreview = [];
+
+    public array $paymentEdit = [];
+
+    public string $paymentReason = '';
 
     public string $search = '';
 
@@ -150,6 +166,51 @@ class Admin extends Component
         $this->resetValidation();
     }
 
+    public function showBreakdown(string $kind): void
+    {
+        abort_unless(in_array($kind, ['sales', 'cash', 'pending', 'investment', 'profit', 'packs']), 404);
+        $this->breakdownKind = $kind;
+        $this->form = 'breakdown';
+        $this->selected = null;
+        $this->resetPage('detailPage');
+        $this->resetValidation();
+    }
+
+    public function editPayment(int $id): void
+    {
+        $payment = DB::table('receipts')->find($id);
+        abort_unless($payment, 404);
+        $this->selected = null;
+        $this->editingPayment = $id;
+        $this->form = 'payment-correction';
+        $this->paymentEdit = ['amount' => Money::input($payment->amount), 'paid_on' => $payment->paid_on, 'reference' => $payment->reference ?? ''];
+        $this->paymentReason = '';
+        $this->paymentPreview = [];
+        $this->correctionKey = (string) Str::uuid();
+        $this->resetValidation();
+    }
+
+    public function previewPayment(PaymentCorrections $corrections): void
+    {
+        $this->resetValidation();
+        $this->paymentPreview = [];
+        $this->paymentPreview = $corrections->preview($this->editingPayment, $this->paymentEdit, $this->paymentReason);
+    }
+
+    public function savePaymentCorrection(PaymentCorrections $corrections): void
+    {
+        if (! $this->paymentPreview) {
+            $this->addError('paymentReason', 'Review the preview before confirming.');
+
+            return;
+        }
+        $corrections->save($this->editingPayment, $this->paymentEdit, $this->paymentReason, $this->correctionKey, $this->paymentPreview['fingerprint']);
+        $this->notice = 'Payment entry corrected with an audit revision. Cash and balances refreshed; issued invoices keep their original snapshots.';
+        $this->paymentPreview = [];
+        $this->showBreakdown('cash');
+        $this->dispatch('inventory-changed');
+    }
+
     private function dates(): void
     {
         $required = 'nullable';
@@ -163,6 +224,7 @@ class Admin extends Component
         $this->appliedTo = $this->to;
         $this->resetPage();
         $this->resetPage('batchesPage');
+        $this->resetPage('detailPage');
         $this->dispatch('date-range-applied', range: ['from' => $this->appliedFrom, 'to' => $this->appliedTo]);
     }
 
@@ -179,6 +241,7 @@ class Admin extends Component
         $this->from = $this->to = $this->appliedFrom = $this->appliedTo = '';
         $this->resetPage();
         $this->resetPage('batchesPage');
+        $this->resetPage('detailPage');
         $this->resetValidation(['from', 'to']);
         $this->dispatch('date-range-applied', range: ['from' => '', 'to' => '']);
     }
@@ -459,7 +522,7 @@ class Admin extends Component
         $selected = $this->selected ? DB::table('orders')->find($this->selected) : null;
         $bars = DB::table('orders')->where('status', 'Delivered')->whereBetween('delivered_on', [$from, $to])->select('delivered_on')->selectRaw('SUM(total) revenue')->groupBy('delivered_on')->orderBy('delivered_on')->get();
 
-        return view('livewire.admin', ['summary' => $reports->summary($from, $to), 'orders' => $query->orderByDesc('o.id')->paginate($this->page === 'dashboard' ? 4 : 12), 'products' => DB::table('products')->orderBy('name')->get(), 'batches' => $reports->batches($from, $to), 'selectedOrder' => $selected, 'items' => $selected ? DB::table('order_items')->where('order_id', $selected->id)->get() : collect(), 'allocations' => $selected ? $ops->allocations($selected->id) : collect(), 'receipts' => $selected ? DB::table('receipts')->where('order_id', $selected->id)->orderBy('id')->get() : collect(), 'netPaid' => $selected ? $ops->paid($selected->id) : 0, 'issued' => $selected ? DB::table('invoices')->where('order_id', $selected->id)->orderByDesc('version')->get() : collect(), 'bars' => $bars, 'statuses' => DB::table('orders')->whereBetween('ordered_on', [$from, $to])->select('status')->selectRaw('COUNT(*) count')->groupBy('status')->pluck('count', 'status'), 'dispatchCount' => DB::table('orders')->where('status', 'Pending')->count()])->layout('layouts.app', ['page' => $this->page]);
+        return view('livewire.admin', ['packSummary' => $reports->packs($from, $to), 'breakdownRows' => $this->form === 'breakdown' ? $reports->breakdown($this->breakdownKind, $from, $to) : null, 'summary' => $reports->summary($from, $to), 'orders' => $query->orderByDesc('o.id')->paginate($this->page === 'dashboard' ? 4 : 12), 'products' => DB::table('products')->orderBy('name')->get(), 'batches' => $reports->batches($from, $to), 'selectedOrder' => $selected, 'items' => $selected ? DB::table('order_items')->where('order_id', $selected->id)->get() : collect(), 'allocations' => $selected ? $ops->allocations($selected->id) : collect(), 'receipts' => $selected ? DB::table('receipts')->where('order_id', $selected->id)->orderBy('id')->get() : collect(), 'netPaid' => $selected ? $ops->paid($selected->id) : 0, 'issued' => $selected ? DB::table('invoices')->where('order_id', $selected->id)->orderByDesc('version')->get() : collect(), 'bars' => $bars, 'statuses' => DB::table('orders')->whereBetween('ordered_on', [$from, $to])->select('status')->selectRaw('COUNT(*) count')->groupBy('status')->pluck('count', 'status'), 'dispatchCount' => DB::table('orders')->where('status', 'Pending')->count()])->layout('layouts.app', ['page' => $this->page]);
     }
 
     private function validateMoneyFields(array $fields): void
