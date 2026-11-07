@@ -8,7 +8,7 @@
         <a href="{{ route('dashboard') }}" class="wordmark">Hive’s Best<span>GOODNESS, NATURALLY.</span></a>
         <div class="admin-greeting">Hi, {{ Str::before(auth()->user()->name,' ') }}! <span aria-hidden="true">☀</span></div>
         <nav class="nav flex-column">
-            @foreach(['dashboard'=>['house-door-fill','Dashboard'],'orders'=>['bag-heart-fill','Orders'],'stock'=>['box-seam-fill','Stock'],'reports'=>['bar-chart-line-fill','Reports']] as $key=>$nav)
+            @foreach(['dashboard'=>['house-door-fill','Dashboard'],'orders'=>['bag-heart-fill','Orders'],'stock'=>['box-seam-fill','Stock']] as $key=>$nav)
             <a href="{{ route($key) }}" class="nav-link {{ ($page ?? '')===$key ? 'active':'' }}" @if(($page ?? '')===$key) aria-current="page" @endif><i aria-hidden="true" class="bi bi-{{ $nav[0] }}"></i>{{ $nav[1] }}</a>
             @endforeach
         </nav>

@@ -46,15 +46,17 @@ window.hiveSelect = value => ({
 });
 
 window.hiveDate = (value, today) => ({
-    value, picker: null, observer: null,
+    value, picker: null, observer: null, listeners: null,
     init() {
         const input = this.$refs.control;
+        this.listeners = new AbortController();
+        const listen = (name, handler, capture = false) => input.addEventListener(name, handler, {capture, signal:this.listeners.signal});
         this.picker = flatpickr(input, { dateFormat: 'Y-m-d', ariaDateFormat: 'F j, Y', now: today, allowInput: true, disableMobile: true, monthSelectorType: 'static',
             defaultDate: this.value || null, maxDate: input.getAttribute('max') || null, minDate: input.getAttribute('min') || null,
             appendTo: document.body,
             onChange: (_dates, date) => { this.value = date; },
             onOpen: () => { this.$el.closest('.modal')?.setAttribute('data-picker-open','true'); },
-            onClose: () => { this.$el.closest('.modal')?.removeAttribute('data-picker-open'); input.value = this.value || ''; },
+            onClose: () => { this.$el.closest('.modal')?.removeAttribute('data-picker-open'); },
             onReady: (_dates, _text, picker) => {
                 const footer = document.createElement('div'); footer.className = 'calendar-footer';
                 for (const [label, action] of [['Clear', () => { this.value=''; picker.clear(); picker.close(); }], ['Today', () => { picker.setDate(today,true); picker.close(); }], ['Close', () => picker.close()]]) {
@@ -67,7 +69,7 @@ window.hiveDate = (value, today) => ({
         });
         input.value = this.value || '';
         this.observer=trackValidity(this,input);
-        input.addEventListener('input', () => { this.value=input.value; });
+        listen('input', () => { this.value=input.value; });
         const invalidEntry=()=>{
             const text=input.value;
             if(!text) return false;
@@ -76,15 +78,23 @@ window.hiveDate = (value, today) => ({
             return !date || flatpickr.formatDate(date,'Y-m-d')!==text || (input.max && text>input.max) || (input.min && text<input.min);
         };
         const preserve=event=>{ if(invalidEntry()) { event.stopImmediatePropagation(); this.value=input.value; this.picker.close(); input.value=this.value; } };
-        input.addEventListener('blur',preserve,true);
-        input.addEventListener('keydown',event=>{if(event.key==='Enter')preserve(event);},true);
-        input.addEventListener('keydown', event => { if(event.key === 'Escape' && this.picker.isOpen) { event.stopPropagation(); this.picker.close(); input.focus(); } }, true);
+        listen('blur',preserve,true);
+        listen('keydown',event=>{if(event.key==='Enter')preserve(event);},true);
+        listen('keydown', event => { if(event.key === 'Escape' && this.picker.isOpen) { event.stopPropagation(); this.picker.close(); input.focus(); } }, true);
         this.$watch('value', date => { if(input.value !== (date || '')) { this.picker.setDate(date || null, false); input.value=date || ''; } });
     },
-    destroy() { this.observer?.disconnect(); this.picker?.destroy(); }
+    destroy() { this.listeners?.abort(); this.observer?.disconnect(); this.picker?.destroy(); }
 });
 
 document.addEventListener('livewire:init', () => {
+    document.addEventListener('date-range-applied', event => {
+        const url=new URL(location.href);
+        for(const key of ['from','to']) {
+            if(event.detail.range[key]) url.searchParams.set(key,event.detail.range[key]);
+            else url.searchParams.delete(key);
+        }
+        history.replaceState(history.state,'',url);
+    });
     const channel = 'BroadcastChannel' in window ? new BroadcastChannel('hive-inventory') : null;
     document.addEventListener('inventory-changed', () => channel?.postMessage('refresh'));
     if(channel) channel.onmessage = () => window.Livewire.dispatch('inventory-refresh');

@@ -165,7 +165,7 @@ class OperationsTest extends TestCase
         Livewire::actingAs($user)->test(Admin::class)->assertForbidden();
         $user->is_admin = true;
         $user->save();
-        foreach (['/', '/orders', '/stock', '/reports'] as $url) {
+        foreach (['/', '/orders', '/stock'] as $url) {
             $this->actingAs($user)->get($url)->assertOk();
         }
         Livewire::actingAs($user)->test(Admin::class, ['page' => 'orders'])->call('newOrder')->set('order.customer', 'Livewire QA')->set('order.phone', '03000000000')->set('order.address', 'Test address')->set('lines', [['product_id' => $this->half, 'quantity' => 1, 'price' => '1200']])->call('saveOrder')->assertHasNoErrors();

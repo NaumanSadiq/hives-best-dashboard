@@ -17,7 +17,7 @@ async function login() {
     await page.getByLabel('Password', { exact: true }).fill(credentials.password);
     await page.getByRole('button', { name: /Sign in/ }).click();
     await page.waitForURL(base + '/');
-    await page.locator('.hero img').evaluate(img => img.decode());
+    await page.getByRole('heading',{name:'Business reconciliation'}).waitFor();
 }
 async function noOverflow(label) {
     const sizes = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);

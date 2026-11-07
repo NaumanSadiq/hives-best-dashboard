@@ -1,0 +1,24 @@
+<section class="panel mb-4"><div class="panel-heading"><h2>Business reconciliation</h2><span class="mini-pill">{{ $appliedFrom || $appliedTo ? ($appliedFrom ?: 'Beginning').' → '.($appliedTo ?: 'No end date') : 'All dates' }}</span></div>
+<div class="row g-4"><div class="col-md-6"><h3 class="h6">Sales · delivery date</h3><dl class="totals-list">
+@foreach(['subtotal'=>'Product sales before discounts','discounts'=>'Less discounts','delivery'=>'Billed delivery','revenue'=>'Sales revenue','cost'=>'Less allocated stock costs','courier'=>'Less actual courier costs','profit'=>'Gross profit'] as $key=>$label)<div class="{{ in_array($key,['profit','revenue'])?'total':'' }}"><dt>{{ $label }}</dt><dd>{{ $money($summary[$key]) }}</dd></div>@endforeach
+</dl></div><div class="col-md-6"><h3 class="h6">Cash · payment date</h3><dl class="totals-list">
+@foreach(['received_cash'=>'Receipts','refunded_cash'=>'Less refunds paid','cash'=>'Cash collected, net refunds'] as $key=>$label)<div><dt>{{ $label }}</dt><dd>{{ $money($summary[$key]) }}</dd></div>@endforeach
+</dl><h3 class="h6 mt-3">Current balances · all dates</h3><dl class="totals-list"><div><dt><a href="{{ route('orders',['payment'=>'Pending']) }}">Outstanding active orders</a></dt><dd>{{ $money($summary['pending']) }}</dd></div><div><dt>Refunds due · cancelled orders</dt><dd>{{ $money($summary['refunds']) }}</dd></div></dl></div></div>
+<details class="mt-3"><summary>How these figures reconcile</summary><p class="muted mt-2">Sales include currently delivered orders in the delivery-date range. Cancelled sales are excluded; refunds remain in cash by payment date. Gross profit is sales revenue less corrected stock costs and courier costs. Physical losses are shown separately below. Outstanding payments and stock are current balances across all dates. Batch investment uses received dates. Cost corrections restate previous internal profit.</p></details></section>
+
+<section class="panel"><div class="panel-heading"><h2>Batch investment & realised returns</h2></div><p class="muted">Delivered revenue and profit use the selected delivery dates. Investment and remaining value show each batch’s current corrected basis across all dates.</p>
+<div class="batch-cards">
+@forelse($batches as $b)
+@php($investment=$b->purchase+$b->packaging+$b->branding+$b->other)
+@php($loss=\App\Support\Money::allocate($investment,max(0,$b->original_quantity-$b->physical-($b->dispatched_quantity??0)),$b->original_quantity))
+@if((int)$b->physical===0) @php($loss=max(0,$investment-($b->consumed_cost??0))) @endif
+@php($remaining=max(0,$investment-($b->consumed_cost??0)-$loss))
+@php($unit=$products->firstWhere('stock_key',$b->stock_key)?->kind==='honey'?'g':'units')
+<article class="batch-card" wire:key="batch-return-{{ $b->id }}"><header><div><h3>{{ $b->reference }}</h3><p class="muted">{{ Str::headline($b->stock_key) }} · Received {{ $b->received_on }}</p></div><button class="btn btn-light btn-sm" wire:click="viewBatchHistory({{ $b->id }})">View History</button></header>
+<dl class="batch-figures"><div><dt>Total investment</dt><dd>{{ $money($investment) }}</dd></div><div><dt>Remaining stock value · current</dt><dd>{{ $money($remaining) }}</dd></div><div><dt>Delivered merchandise revenue</dt><dd>{{ $money($b->revenue) }}</dd></div><div><dt>Realised merchandise profit</dt><dd>{{ $money(($b->revenue??0)-($b->realised_cost??0)) }}</dd></div></dl>
+<details><summary>View Breakdown</summary><dl class="preview-grid mt-3">
+@foreach(['purchase'=>'Purchase','packaging'=>'Packaging','branding'=>'Branding','other'=>'Other direct costs'] as $field=>$label)<div><dt>{{ $label }}</dt><dd>{{ $money($b->$field) }}</dd></div>@endforeach
+@foreach(['original_quantity'=>'Received quantity','physical'=>'On hand · current','reserved'=>'Reserved · current'] as $field=>$label)<div><dt>{{ $label }}</dt><dd>{{ number_format($b->$field) }} {{ $unit }}</dd></div>@endforeach
+<div><dt>Available · current</dt><dd>{{ number_format($b->physical-$b->reserved) }} {{ $unit }}</dd></div><div><dt>Dispatched, net returns · all dates</dt><dd>{{ number_format($b->dispatched_quantity??0) }} {{ $unit }}</dd></div><div><dt>Delivered quantity · selected dates</dt><dd>{{ number_format($b->sold??0) }} {{ $unit }}</dd></div><div><dt>Realised stock costs · selected dates</dt><dd>{{ $money($b->realised_cost) }}</dd></div><div><dt>Loss costs · current</dt><dd>{{ $money($loss) }}</dd></div></dl><p class="muted">Investment = purchase + packaging + branding + other costs. Merchandise profit excludes delivery and courier charges, which appear in business totals. Internal costs include audited corrections.</p><button class="btn btn-sage btn-sm" wire:click="batchForm({{ $b->id }})">Edit Batch</button></details></article>
+@empty<p class="muted">Receive a batch to see its investment and returns.</p>@endforelse
+</div>{{ $batches->links() }}</section>

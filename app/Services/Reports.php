@@ -24,7 +24,7 @@ class Reports
             }
         }
 
-        return ['orders' => DB::table('orders')->whereBetween('ordered_on', [$from, $to])->count(), 'revenue' => $revenue, 'cost' => $cost, 'courier' => $courier, 'profit' => $revenue - $cost - $courier, 'cash' => $cash, 'pending' => $pending, 'refunds' => $refunds, 'delivery' => (int) (clone $delivered)->sum('delivery'), 'merchandise' => (int) (clone $delivered)->sum(DB::raw('subtotal-discount'))];
+        return ['orders' => DB::table('orders')->whereBetween('ordered_on', [$from, $to])->count(), 'revenue' => $revenue, 'cost' => $cost, 'courier' => $courier, 'profit' => $revenue - $cost - $courier, 'cash' => $cash, 'pending' => $pending, 'refunds' => $refunds, 'investment' => (int) DB::table('batches')->whereBetween('received_on', [$from, $to])->sum(DB::raw('purchase+packaging+branding+other')), 'discounts' => (int) (clone $delivered)->sum('discount'), 'subtotal' => (int) (clone $delivered)->sum('subtotal'), 'received_cash' => (int) DB::table('receipts')->where('kind', 'receipt')->whereBetween('paid_on', [$from, $to])->sum('amount'), 'refunded_cash' => (int) DB::table('receipts')->where('kind', 'refund')->whereBetween('paid_on', [$from, $to])->sum('amount'), 'delivery' => (int) (clone $delivered)->sum('delivery'), 'merchandise' => (int) (clone $delivered)->sum(DB::raw('subtotal-discount'))];
     }
 
     public function batches(string $from, string $to)
@@ -32,6 +32,6 @@ class Reports
         $sold = DB::table('allocations as a')->join('order_items as i', 'i.id', '=', 'a.order_item_id')->join('orders as o', 'o.id', '=', 'i.order_id')->where('o.status', 'Delivered')->whereBetween('o.delivered_on', [$from, $to])->groupBy('a.batch_id')->select('a.batch_id')->selectRaw('SUM(a.quantity) sold, SUM(a.cost) realised_cost, SUM(a.merchandise) revenue');
         $consumed = DB::table('allocations')->where('dispatched', true)->where('returned', false)->groupBy('batch_id')->select('batch_id')->selectRaw('SUM(cost) consumed_cost, SUM(quantity) dispatched_quantity');
 
-        return DB::table('batches as b')->leftJoinSub($sold, 's', 's.batch_id', '=', 'b.id')->leftJoinSub($consumed, 'c', 'c.batch_id', '=', 'b.id')->select('b.*','s.sold','s.realised_cost','s.revenue','c.consumed_cost','c.dispatched_quantity')->orderByDesc('b.received_on')->paginate(12,pageName: 'batchesPage');
+        return DB::table('batches as b')->leftJoinSub($sold, 's', 's.batch_id', '=', 'b.id')->leftJoinSub($consumed, 'c', 'c.batch_id', '=', 'b.id')->select('b.*', 's.sold', 's.realised_cost', 's.revenue', 'c.consumed_cost', 'c.dispatched_quantity')->orderByDesc('b.received_on')->orderByDesc('b.id')->paginate(6, pageName: 'batchesPage');
     }
 }

@@ -12,9 +12,10 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', 'can:admin'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/', Admin::class)->name('dashboard');
-    foreach (['orders', 'stock', 'reports'] as $page) {
+    foreach (['orders', 'stock'] as $page) {
         Route::get('/'.$page, Admin::class)->defaults('page', $page)->name($page);
     }
+    Route::get('/reports', fn () => redirect()->route('dashboard', request()->only('from', 'to')))->name('reports');
     Route::get('/invoices/{id}', function (int $id) {
         $invoice = DB::table('invoices')->find($id);
         abort_unless($invoice, 404);

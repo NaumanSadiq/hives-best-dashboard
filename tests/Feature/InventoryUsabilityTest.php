@@ -9,7 +9,6 @@ use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -52,7 +51,7 @@ class InventoryUsabilityTest extends TestCase
             $data[$field] = Money::input($data[$field]);
         }
 
-return $data;
+        return $data;
     }
 
     public function test_edit_then_cancel_releases_current_reservation_once_and_remains_discoverable(): void
@@ -67,7 +66,7 @@ return $data;
         $this->assertSame(1, DB::table('order_events')->where('order_id', $id)->where('action', 'Cancelled')->count());
         $number = DB::table('orders')->find($id)->number;
         Livewire::test(Admin::class, ['page' => 'orders'])->assertSet('from', '')->assertSee($number)->set('status', 'Cancelled')->set('search', $number)->assertSee($number)->call('viewOrder', $id)->assertSee('Order & cancellation history', false)->assertSee('Current pending reservations released once.');
-        Livewire::test(Admin::class, ['page' => 'orders'])->set('from', today()->startOfMonth()->toDateString())->assertDontSee($number)->call('resetFilters')->assertSee($number);
+        Livewire::test(Admin::class, ['page' => 'orders'])->set('from', today()->startOfMonth()->toDateString())->assertSee($number)->call('filter')->assertDontSee($number)->call('resetFilters')->assertSee($number);
         Livewire::test(Admin::class, ['page' => 'stock'])->assertSee('10,000 g')->assertDontSee('Apply date range');
     }
 
@@ -92,10 +91,10 @@ return $data;
         $this->ops->editBatch($this->batchId, $data, 'Correct supplier entry');
         $this->assertDatabaseHas('batches', ['id' => $this->batchId, 'reference' => 'QA-CORRECTED', 'physical' => 12000, 'original_quantity' => 12000, 'purchase' => 1100025]);
         $this->assertDatabaseHas('batch_changes', ['batch_id' => $this->batchId, 'reason' => 'Correct supplier entry']);
-        Livewire::test(Admin::class, ['page' => 'stock'])->call('batchForm', $this->batchId)->assertSet('batchLocked', false)->assertSet('batch.purchase', '11000.25');
+        Livewire::test(Admin::class, ['page' => 'stock'])->call('batchForm', $this->batchId)->assertSet('batch.purchase', '11000.25');
     }
 
-    public function test_used_batch_preserves_basis_and_snapshots_even_after_cancellation(): void
+    public function test_used_batch_revises_internal_basis_after_return(): void
     {
         $id = $this->order(2);
         $this->ops->transition($id, 'Dispatched', today()->toDateString());
@@ -108,13 +107,9 @@ return $data;
         $this->ops->transition($id, 'Cancelled', today()->toDateString());
         $this->ops->returnStock($id);
         $data['purchase'] = '5';
-        try {
-            $this->ops->editBatch($this->batchId, $data, 'Attempt basis rewrite');
-            $this->fail('Used basis changed');
-        } catch (ValidationException $e) {
-            $this->assertArrayHasKey('batch.purchase', $e->errors());
-        }
-        $this->assertDatabaseHas('batches', ['purchase' => 1000000, 'original_quantity' => 10000, 'physical' => 10000]);
+        $this->ops->editBatch($this->batchId, $data, 'Correct original supplier cost');
+        $this->assertDatabaseHas('batches', ['purchase' => 500, 'original_quantity' => 10000, 'physical' => 10000]);
+        $this->assertEquals(20050, DB::table('allocations')->sum('cost'));
         Livewire::test(Admin::class, ['page' => 'stock'])->call('batchForm', $this->batchId)->assertSet('batchLocked', true);
     }
 
@@ -123,8 +118,8 @@ return $data;
         $component = Livewire::test(Admin::class, ['page' => 'stock'])->set('adjustBatch', $this->batchId)->set('adjustDirection', 'remove')->set('adjustQuantity', '500')->set('adjustReason', 'Container loss')->call('adjust')->assertHasNoErrors();
         $this->assertDatabaseHas('batches', ['physical' => 9500]);
         $component->set('adjustDirection', 'restore')->set('adjustQuantity', '500')->set('adjustReason', 'Found sealed container')->call('adjust')->assertHasNoErrors();
-        $this->assertDatabaseHas('batches',['physical' => 10000]);
-        $component->set('adjustQuantity','-500')->call('adjust')->assertHasErrors(['adjustQuantity'])->assertSet('adjustQuantity','-500');
-        $this->assertSame(2,DB::table('stock_adjustments')->count());
+        $this->assertDatabaseHas('batches', ['physical' => 10000]);
+        $component->set('adjustQuantity', '-500')->call('adjust')->assertHasErrors(['adjustQuantity'])->assertSet('adjustQuantity', '-500');
+        $this->assertSame(2, DB::table('stock_adjustments')->count());
     }
 }

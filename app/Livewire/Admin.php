@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Services\BatchCorrections;
 use App\Services\Operations;
 use App\Services\Reports;
 use App\Support\Money;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -27,6 +29,22 @@ class Admin extends Component
     public string $from = '';
 
     public string $to = '';
+
+    #[Locked]
+    public string $appliedFrom = '';
+
+    #[Locked]
+    public string $appliedTo = '';
+
+    #[Locked]
+    public array $batchPreview = [];
+
+    #[Locked]
+    public string $batchKey = '';
+
+    public string $stockCount = '';
+
+    public ?int $historyBatch = null;
 
     public string $status = '';
 
@@ -93,8 +111,16 @@ class Admin extends Component
     {
         abort_unless(in_array($page, ['dashboard', 'orders', 'stock', 'reports']), 404);
         $this->page = $page;
-        $this->from = $page === 'orders' ? '' : today()->startOfMonth()->toDateString();
-        $this->to = $page === 'orders' ? '' : today()->toDateString();
+        $this->from = $this->to = '';
+        $requested = request()->only('from', 'to');
+        if ($requested && ! validator($requested, ['from' => 'nullable|date_format:Y-m-d', 'to' => ['nullable', 'date_format:Y-m-d', ...(! empty($requested['from']) ? ['after_or_equal:from'] : [])]])->fails()) {
+            $this->from = (string) ($requested['from'] ?? '');
+            $this->to = (string) ($requested['to'] ?? '');
+            $this->appliedFrom = $this->from;
+            $this->appliedTo = $this->to;
+        }
+        $this->status = in_array(request('status'), ['Pending', 'Dispatched', 'Delivered', 'Cancelled']) ? request('status') : '';
+        $this->paymentFilter = in_array(request('payment'), ['Pending', 'Paid']) ? request('payment') : '';
         $this->paidOn = $this->actionDate = today()->toDateString();
         $this->paymentKey = (string) Str::uuid();
     }
@@ -126,23 +152,35 @@ class Admin extends Component
 
     private function dates(): void
     {
-        $required = $this->page === 'orders' ? 'nullable' : 'required';
+        $required = 'nullable';
         $this->validate(['from' => $required.'|date_format:Y-m-d', 'to' => [$required, 'date_format:Y-m-d', ...($this->from ? ['after_or_equal:from'] : [])]]);
     }
 
     public function filter(): void
     {
         $this->dates();
+        $this->appliedFrom = $this->from;
+        $this->appliedTo = $this->to;
         $this->resetPage();
+        $this->resetPage('batchesPage');
+        $this->dispatch('date-range-applied', range: ['from' => $this->appliedFrom, 'to' => $this->appliedTo]);
     }
 
     public function resetFilters(): void
     {
         $this->search = $this->status = $this->paymentFilter = '';
-        $this->from = $this->page === 'orders' ? '' : today()->startOfMonth()->toDateString();
-        $this->to = $this->page === 'orders' ? '' : today()->toDateString();
+        $this->clearDates();
         $this->resetPage();
         $this->resetValidation();
+    }
+
+    public function clearDates(): void
+    {
+        $this->from = $this->to = $this->appliedFrom = $this->appliedTo = '';
+        $this->resetPage();
+        $this->resetPage('batchesPage');
+        $this->resetValidation(['from', 'to']);
+        $this->dispatch('date-range-applied', range: ['from' => '', 'to' => '']);
     }
 
     #[On('inventory-refresh')]
@@ -324,7 +362,9 @@ class Admin extends Component
         $this->form = 'batch';
         $this->editingBatch = $id;
         $this->batchLocked = false;
-        $this->batchReason = '';
+        $this->batchReason = $this->stockCount = '';
+        $this->batchPreview = [];
+        $this->batchKey = (string) Str::uuid();
         $this->batch = ['reference' => '', 'stock_key' => '', 'received_on' => today()->toDateString(), 'original_quantity' => '', 'purchase' => '0', 'packaging' => '0', 'branding' => '0', 'other' => '0'];
         if ($id) {
             $b = DB::table('batches')->find($id);
@@ -337,13 +377,34 @@ class Admin extends Component
         }
     }
 
-    public function saveBatch(Operations $ops): void
+    public function previewBatch(BatchCorrections $corrections): void
     {
-        $this->validate(['editingBatch' => 'required|integer|exists:batches,id', 'batchReason' => 'required|string|min:5|max:2000']);
-        $ops->editBatch($this->editingBatch, $this->batch, $this->batchReason);
+        $this->resetValidation();
+        $this->batchPreview = [];
+        $this->validate(['editingBatch' => 'required|exists:batches,id']);
+        $this->batchPreview = $corrections->preview($this->editingBatch, $this->batch, $this->batchReason, $this->stockCount);
+    }
+
+    public function saveBatch(BatchCorrections $corrections): void
+    {
+        if (! $this->batchPreview) {
+            $this->addError('batchReason', 'Review the correction preview before confirming.');
+
+            return;
+        }
+        $corrections->save($this->editingBatch, $this->batch, $this->batchReason, $this->stockCount, $this->batchKey, $this->batchPreview['fingerprint']);
         $this->form = '';
-        $this->notice = 'Batch updated. Current stock and investment refreshed.';
+        $this->batchPreview = [];
+        $this->notice = 'Batch correction saved. Stock and internal costs updated; issued invoices are unchanged. View History for the revision.';
         $this->dispatch('inventory-changed');
+    }
+
+    public function viewBatchHistory(int $id): void
+    {
+        abort_unless(DB::table('batches')->where('id', $id)->exists(), 404);
+        $this->historyBatch = $id;
+        $this->selected = null;
+        $this->form = 'history';
     }
 
     public function receiveBatch(Operations $ops): void
@@ -354,7 +415,10 @@ class Admin extends Component
         foreach (['purchase', 'packaging', 'branding', 'other'] as $field) {
             $values[$field] = Money::parse($values[$field]);
         }
-        $ops->transaction(fn () => DB::table('batches')->insert($values + ['physical' => $values['original_quantity'], 'created_at' => now(), 'updated_at' => now()]));
+        $ops->transaction(function () use ($values) {
+            $id = DB::table('batches')->insertGetId($values + ['physical' => $values['original_quantity'], 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('batch_changes')->insert(['batch_id' => $id, 'user_id' => auth()->id(), 'kind' => 'created', 'reason' => 'Stock received', 'before' => '{}', 'after' => json_encode(DB::table('batches')->find($id)), 'created_at' => now()]);
+        });
         $this->form = '';
         $this->notice = 'Batch received and available for orders.';
         $this->dispatch('inventory-changed');
@@ -376,22 +440,13 @@ class Admin extends Component
 
     public function render()
     {
-        $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->from) ? $this->from : today()->startOfMonth()->toDateString();
-        $to = preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->to) ? $this->to : today()->toDateString();
+        $from = $this->appliedFrom ?: '0001-01-01';
+        $to = $this->appliedTo ?: '9999-12-31';
         $reports = new Reports;
         $ops = new Operations;
         $payments = DB::table('receipts')->select('order_id')->selectRaw("SUM(CASE WHEN kind='receipt' THEN amount ELSE -amount END) net")->groupBy('order_id');
         $query = DB::table('orders as o')->leftJoinSub($payments, 'p', 'p.order_id', '=', 'o.id')->select('o.*', DB::raw('COALESCE(p.net,0) as paid'));
-        if ($this->page !== 'orders') {
-            $query->whereBetween('o.ordered_on', [$from, $to]);
-        } else {
-            if ($this->from) {
-                $query->whereDate('o.ordered_on', '>=', $this->from);
-            }
-            if ($this->to) {
-                $query->whereDate('o.ordered_on', '<=', $this->to);
-            }
-        }
+        $query->whereBetween('o.ordered_on', [$from, $to]);
         if ($this->search !== '') {
             $query->where(fn ($q) => $q->where('o.number', 'like', '%'.$this->search.'%')->orWhere('o.customer', 'like', '%'.$this->search.'%'));
         }

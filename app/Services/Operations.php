@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class Operations
@@ -264,31 +263,6 @@ class Operations
 
     public function editBatch(int $id, array $data, string $reason): void
     {
-        $this->transaction(function () use ($id, $data, $reason) {
-            $b = DB::table('batches')->lockForUpdate()->find($id);
-            if (! $b) {
-                $this->fail('Batch not found.');
-            }
-            try {
-                $data = validator($data, ['reference' => ['required', 'string', 'max:100', Rule::unique('batches', 'reference')->ignore($id)], 'stock_key' => 'required|exists:products,stock_key', 'received_on' => 'required|date_format:Y-m-d|before_or_equal:today', 'original_quantity' => 'required|integer|min:1|max:100000000', 'purchase' => 'required|regex:/^\d{1,9}(\.\d{1,2})?$/', 'packaging' => 'required|regex:/^\d{1,9}(\.\d{1,2})?$/', 'branding' => 'required|regex:/^\d{1,9}(\.\d{1,2})?$/', 'other' => 'required|regex:/^\d{1,9}(\.\d{1,2})?$/'])->validate();
-            } catch (ValidationException $e) {
-                throw ValidationException::withMessages(collect($e->errors())->mapWithKeys(fn ($messages, $field) => ['batch.'.$field => $messages])->all());
-            }
-            validator(['reason' => $reason], ['reason' => 'required|string|min:5|max:2000'])->validate();
-            foreach (['purchase', 'packaging', 'branding', 'other'] as $field) {
-                $data[$field] = Money::parse($data[$field]);
-            }
-            if ($this->batchUsed($id)) {
-                foreach (['stock_key', 'received_on', 'original_quantity', 'purchase', 'packaging', 'branding', 'other'] as $field) {
-                    if ((string) $data[$field] !== (string) $b->$field) {
-                        throw ValidationException::withMessages(['batch.'.$field => 'This batch has inventory history. Its pool, received date, original quantity and cost basis are locked; use a documented stock adjustment for physical corrections.']);
-                    }
-                }
-            } else {
-                $data['physical'] = (int) $data['original_quantity'];
-            }
-            DB::table('batches')->where('id', $id)->update($data + ['updated_at' => now()]);
-            DB::table('batch_changes')->insert(['batch_id' => $id, 'user_id' => auth()->id(), 'kind' => 'edit', 'reason' => $reason, 'before' => json_encode($b), 'after' => json_encode(DB::table('batches')->find($id)), 'created_at' => now()]);
-        });
+        app(BatchCorrections::class)->save($id, $data, $reason);
     }
 }
