@@ -33,6 +33,7 @@ class Operations
             if ($id && (! $old || $old->status !== 'Pending')) {
                 $this->fail('Only pending orders can be edited.');
             }
+            $customerId = app(Customers::class)->resolve($data, $key, $old);
             if ($old) {
                 foreach ($this->allocations($id) as $a) {
                     DB::table('batches')->where('id', $a->batch_id)->decrement('reserved', $a->quantity);
@@ -68,12 +69,14 @@ class Operations
                 $this->fail('Total cannot be reduced below net receipts.');
             }
             $values = array_intersect_key($data, array_flip(['customer', 'phone', 'address', 'ordered_on', 'tracking', 'notes']));
+            $values['customer_id'] = $customerId;
             $values += ['subtotal' => $subtotal, 'discount' => $discount, 'delivery' => $delivery, 'courier' => Money::parse($data['courier']), 'total' => $total, 'updated_at' => now()];
             if ($old) {
                 DB::table('orders')->where('id', $id)->update($values);
             } else {
                 $id = DB::table('orders')->insertGetId($values + ['request_key' => $key, 'number' => 'HB-'.now()->format('ymd').'-'.Str::upper(Str::random(8)), 'created_at' => now()]);
             }
+            DB::table('customers')->where('id', $customerId)->whereNull('source_order_id')->update(['source_order_id' => $id]);
             foreach ($items as [$product, $price, $quantity]) {
                 $itemId = DB::table('order_items')->insertGetId(['order_id' => $id, 'product_id' => $product->id, 'kind' => $product->kind, 'name' => $product->name, 'quantity' => $quantity, 'pack_quantity' => $product->pack_quantity, 'unit_price' => $price]);
                 $remaining = $quantity * $product->pack_quantity;
@@ -208,8 +211,8 @@ class Operations
             if ($kind === 'receipt' && ($order->status === 'Cancelled' || $value > $order->total - $paid)) {
                 $this->fail('Receipt exceeds balance or order is cancelled.');
             }
-            if ($kind === 'refund' && ($order->status !== 'Cancelled' || $value > $paid)) {
-                $this->fail('Refund must be against a cancelled order and cannot exceed net receipts.');
+            if ($kind === 'refund' && $value > ($order->status === 'Cancelled' ? $paid : max(0, $paid - $order->total))) {
+                $this->fail('Refund cannot exceed the cancelled payment or the active order’s overpayment.');
             }
             DB::table('receipts')->insert(['order_id' => $id, 'kind' => $kind, 'amount' => $value, 'paid_on' => $date, 'reference' => $reference, 'request_key' => $key, 'created_at' => now(), 'updated_at' => now()]);
         });

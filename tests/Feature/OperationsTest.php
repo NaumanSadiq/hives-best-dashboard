@@ -235,7 +235,7 @@ class OperationsTest extends TestCase
         $admin = User::factory()->create();
         $admin->is_admin = true;
         $admin->save();
-        Livewire::actingAs($admin)->test(Admin::class)->call('viewOrder', $id)->set('courierInput', '175.25')->set('trackingInput', 'UPDATED-TRACK')->call('saveOperationalDetails')->assertHasNoErrors();
+        Livewire::actingAs($admin)->test(Admin::class)->call('editAmounts', $id)->set('amountEdit.courier', '175.25')->set('amountReason', 'Correct courier charge')->call('previewAmounts')->call('saveAmounts')->assertHasNoErrors()->set('trackingInput', 'UPDATED-TRACK')->call('saveOperationalDetails')->assertHasNoErrors();
         $this->assertDatabaseHas('orders', ['id' => $id, 'courier' => 17525, 'tracking' => 'UPDATED-TRACK']);
         $this->assertSame(152475, $reports->summary($delivered, $delivered)['profit']);
     }

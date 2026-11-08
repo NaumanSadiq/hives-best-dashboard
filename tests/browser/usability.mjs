@@ -36,7 +36,7 @@ row=await stockRow(page,data.unusedRef+'-EDITED');assert((await row.innerText())
 // Used batches expose only the safe fields.
 row=await stockRow(page,data.batchRef);await row.getByRole('button',{name:'Edit Batch',exact:true}).click();await dialog.waitFor();assert(await dialog.locator('#batch-original_quantity').isEnabled());assert(await dialog.locator('#batch-purchase').isEnabled());assert(await dialog.locator('#batch-received_on').isEnabled());await dialog.getByRole('button',{name:'Close dialog'}).click();await saved();
 // All dates includes the October order. Edit it to 1,000 g, then cancel.
-await page.goto(base+'/orders');await page.getByRole('button').filter({hasText:data.number}).click();await dialog.getByRole('button',{name:'Edit Order',exact:true}).click();await dialog.locator('#quantity-0').fill('2');await dialog.getByRole('button',{name:'Save & reserve stock'}).click();await dialog.getByRole('heading',{name:'Batch allocation'}).waitFor();
+await page.goto(base+'/orders');await page.getByRole('button').filter({hasText:data.number}).click();await dialog.getByRole('button',{name:'Edit items / customer',exact:true}).click();await dialog.locator('#quantity-0').fill('2');await dialog.getByRole('button',{name:'Save & reserve stock'}).click();await dialog.getByRole('heading',{name:'Batch allocation'}).waitFor();
 assert.equal((await fixture('inspect',String(data.batch))).reserved,1000);
 const stock=await context.newPage();row=await stockRow(stock,data.batchRef);assert((await row.innerText()).includes('9,000 g'));
 page.once('dialog',d=>d.accept());await dialog.getByRole('button',{name:'Cancel order',exact:true}).click();await dialog.locator('.status-cancelled').waitFor();

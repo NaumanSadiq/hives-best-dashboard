@@ -21,6 +21,7 @@ class Reports
                 $refunds += max(0, (int) $o->net);
             } else {
                 $pending += max(0, $o->total - (int) $o->net);
+                $refunds += max(0, (int) $o->net - $o->total);
             }
         }
 
@@ -31,6 +32,7 @@ class Reports
         $active = $this->balances()->where('o.status', '!=', 'Cancelled')->get();
         $extras['active_total'] = (int) $active->sum('total');
         $extras['active_paid'] = (int) $active->sum('paid');
+        $extras['active_applied'] = (int) $active->sum(fn ($order) => min($order->total, $order->paid));
         foreach (['Delivered' => 'delivered_cash', 'Cancelled' => 'cancelled_cash'] as $status => $key) {
             $extras[$key] = (int) $this->paymentEntries($from, $to)->where('o.status', $status)->sum(DB::raw("CASE WHEN r.kind='receipt' THEN r.amount ELSE -r.amount END"));
         }
@@ -93,6 +95,6 @@ class Reports
         }
         $costs = DB::table('allocations as a')->join('order_items as i', 'i.id', '=', 'a.order_item_id')->select('i.order_id')->selectRaw('SUM(a.cost) allocated_cost')->groupBy('i.order_id');
 
-        return $this->deliveredOrders($from, $to)->leftJoinSub($costs,'c','c.order_id','=','orders.id')->select('orders.*')->selectRaw('COALESCE(c.allocated_cost,0) allocated_cost')->orderByDesc('delivered_on')->orderByDesc('orders.id')->paginate(10,pageName: 'detailPage');
+        return $this->deliveredOrders($from, $to)->leftJoinSub($costs, 'c', 'c.order_id', '=', 'orders.id')->select('orders.*')->selectRaw('COALESCE(c.allocated_cost,0) allocated_cost')->orderByDesc('delivered_on')->orderByDesc('orders.id')->paginate(10, pageName: 'detailPage');
     }
 }

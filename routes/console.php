@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\Customers;
 use App\Services\Operations;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -35,3 +36,7 @@ Artisan::command('hive:admin', function () {
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('hive:backfill-customers', function () {
+    $this->line(json_encode(app(Customers::class)->backfill(), JSON_PRETTY_PRINT));
+})->purpose('Link unlinked orders to conservatively matched customer profiles');

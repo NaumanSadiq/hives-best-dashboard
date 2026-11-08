@@ -3,9 +3,12 @@
 namespace App\Livewire;
 
 use App\Services\BatchCorrections;
+use App\Services\Customers;
 use App\Services\Operations;
+use App\Services\OrderCorrections;
 use App\Services\PaymentCorrections;
 use App\Services\Reports;
+use App\Services\Savings;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -14,6 +17,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -23,7 +27,127 @@ class Admin extends Component
 
     protected $paginationTheme = 'bootstrap';
 
+    #[Locked]
+    public array $amountReview = [];
+
+    #[Locked]
+    public string $amountFingerprint = '';
+
+    #[Locked]
+    public string $amountKey = '';
+
+    #[Locked]
+    public string $pendingFingerprint = '';
+
+    #[Locked]
+    public ?int $amountOrder = null;
+
+    public array $amountEdit = [];
+
+    public string $amountReason = '';
+
+    #[Locked]
+    public array $savingsState = [];
+
+    #[Locked]
+    public array $savingsReview = [];
+
+    #[Locked]
+    public string $savingsKey = '';
+
+    public array $savingsEdit = [];
+
+    public string $savingsFrom = '';
+
+    public string $savingsTo = '';
+
+    public function editAmounts(int $id): void
+    {
+        $service = app(OrderCorrections::class);
+        $snapshot = $service->snapshot($id);
+        $this->amountOrder = $id;
+        $this->amountFingerprint = $service->fingerprint($snapshot);
+        $this->amountKey = (string) Str::uuid();
+        $this->amountEdit = ['prices' => []];
+        foreach (['discount', 'delivery', 'courier'] as $field) {
+            $this->amountEdit[$field] = Money::input($snapshot['order'][$field]);
+        }
+        foreach ($snapshot['items'] as $item) {
+            $this->amountEdit['prices'][$item['id']] = Money::input($item['unit_price']);
+        }
+        $this->amountReason = '';
+        $this->amountReview = [];
+        $this->selected = null;
+        $this->form = 'order-amounts';
+        $this->resetValidation();
+    }
+
+    public function previewAmounts(): void
+    {
+        $this->amountReview = [];
+        $this->amountReview = app(OrderCorrections::class)->preview($this->amountOrder, $this->amountEdit, $this->amountReason, $this->amountFingerprint);
+    }
+
+    public function saveAmounts(): void
+    {
+        if (! $this->amountReview) {
+            $this->addError('operation', 'Preview the correction first.');
+
+            return;
+        }
+        app(OrderCorrections::class)->save($this->amountOrder, $this->amountEdit, $this->amountReason, $this->amountKey, $this->amountReview);
+        $this->viewOrder($this->amountOrder);
+        $this->notice = 'Order amounts corrected. Payments and issued invoice versions are retained.';
+    }
+
+    public function openSavings(string $type = 'history', ?int $entry = null): void
+    {
+        $this->selected = null;
+        $this->form = $type === 'history' ? 'savings-history' : 'savings';
+        $this->savingsState = app(Savings::class)->state();
+        $this->savingsReview = [];
+        $this->savingsKey = (string) Str::uuid();
+        $this->savingsEdit = ['type' => $type, 'entry' => $entry, 'amount' => $type === 'count' ? Money::input($this->savingsState['balance']) : '', 'date' => today()->toDateString(), 'note' => ''];
+        $this->resetValidation();
+    }
+
+    public function previewSavings(): void
+    {
+        $this->savingsReview = [];
+        $this->savingsReview = app(Savings::class)->preview($this->savingsEdit, $this->savingsState);
+    }
+
+    public function saveSavings(): void
+    {
+        if (! $this->savingsReview) {
+            $this->addError('operation', 'Preview the movement first.');
+
+            return;
+        }
+        app(Savings::class)->save($this->savingsEdit, $this->savingsKey, $this->savingsReview);
+        $this->openSavings('history');
+        $this->notice = 'Savings movement recorded with its audit history.';
+    }
+
     public string $page = 'dashboard';
+
+    #[Url(as: 'tab', except: 'overview')]
+    public string $dashboardTab = 'overview';
+
+    public string $customerSearch = '';
+
+    public bool $saveCustomerProfile = false;
+
+    public bool $confirmDistinctCustomer = false;
+
+    public bool $confirmCustomerChange = false;
+
+    #[Locked]
+    public ?int $customerId = null;
+
+    public array $profile = [];
+
+    public bool $reviewedCustomer = false;
 
     public string $breakdownKind = 'cash';
 
@@ -40,6 +164,7 @@ class Admin extends Component
 
     public string $paymentReason = '';
 
+    #[Url(as: 'q', except: '')]
     public string $search = '';
 
     public string $from = '';
@@ -62,8 +187,10 @@ class Admin extends Component
 
     public ?int $historyBatch = null;
 
+    #[Url(except: '')]
     public string $status = '';
 
+    #[Url(as: 'payment', except: '')]
     public string $paymentFilter = '';
 
     public ?int $selected = null;
@@ -125,7 +252,7 @@ class Admin extends Component
 
     public function mount(string $page = 'dashboard'): void
     {
-        abort_unless(in_array($page, ['dashboard', 'orders', 'stock', 'reports']), 404);
+        abort_unless(in_array($page, ['dashboard', 'orders', 'stock', 'reports', 'customers']), 404);
         $this->page = $page;
         $this->from = $this->to = '';
         $requested = request()->only('from', 'to');
@@ -139,11 +266,78 @@ class Admin extends Component
         $this->paymentFilter = in_array(request('payment'), ['Pending', 'Paid']) ? request('payment') : '';
         $this->paidOn = $this->actionDate = today()->toDateString();
         $this->paymentKey = (string) Str::uuid();
+        if (! in_array($this->dashboardTab, ['overview', 'finance', 'stock', 'customers'])) {
+            $this->dashboardTab = 'overview';
+        }
+        if ($page === 'customers' && ctype_digit((string) request('customer'))) {
+            $this->viewCustomer((int) request('customer'));
+        }
+    }
+
+    public function selectDashboardTab(string $tab): void
+    {
+        if (in_array($tab, ['overview', 'finance', 'stock', 'customers'])) {
+            $this->dashboardTab = $tab;
+        }
+    }
+
+    public function selectCustomer(int $id): void
+    {
+        $c = DB::table('customers')->find($id);
+        abort_unless($c, 404);
+        $this->order['customer_id'] = $c->id;
+        $this->order['customer'] = $c->name;
+        $this->order['phone'] = $c->phone;
+        $this->order['address'] = $c->address;
+        $this->customerSearch = '';
+        $this->saveCustomerProfile = false;
+        $this->confirmCustomerChange = false;
+        $this->resetValidation();
+    }
+
+    public function newCustomerEntry(): void
+    {
+        $this->order['customer_id'] = null;
+        $this->order['customer'] = '';
+        $this->order['phone'] = '';
+        $this->order['address'] = '';
+        $this->customerSearch = '';
+        $this->saveCustomerProfile = false;
+        $this->confirmDistinctCustomer = false;
+        $this->confirmCustomerChange = false;
+    }
+
+    public function viewCustomer(int $id): void
+    {
+        abort_unless(DB::table('customers')->where('id', $id)->exists(), 404);
+        $this->customerId = $id;
+        $this->selected = null;
+        $this->form = 'customer';
+        $this->resetPage('customerOrdersPage');
+        $this->resetValidation();
+    }
+
+    public function editCustomer(int $id): void
+    {
+        $this->viewCustomer($id);
+        $this->form = 'customer-edit';
+        $c = DB::table('customers')->find($id);
+        $this->profile = ['name' => $c->name, 'phone' => $c->phone, 'address' => $c->address];
+        $this->reviewedCustomer = (bool) $c->reviewed_at;
+    }
+
+    public function saveCustomer(Customers $customers): void
+    {
+        $this->validate(['profile.name' => 'required|string|max:255', 'profile.phone' => 'required|string|max:40', 'profile.address' => 'required|string|max:2000']);
+        $customers->update($this->customerId, $this->profile, $this->reviewedCustomer);
+        $this->viewCustomer($this->customerId);
+        $this->notice = 'Customer profile saved for future orders. Existing order details and issued invoices retain their snapshots.';
     }
 
     public function updatedSearch(): void
     {
         $this->resetPage();
+        $this->resetPage('customersPage');
     }
 
     public function updatedStatus(): void
@@ -265,6 +459,10 @@ class Admin extends Component
     {
         $this->resetValidation();
         $this->editing = $id;
+        $this->customerSearch = '';
+        $this->saveCustomerProfile = false;
+        $this->confirmDistinctCustomer = false;
+        $this->confirmCustomerChange = false;
         $this->selected = null;
         $this->form = 'order';
         $this->requestKey = (string) Str::uuid();
@@ -273,6 +471,8 @@ class Admin extends Component
         if ($id) {
             $o = DB::table('orders')->find($id);
             abort_unless($o && $o->status === 'Pending', 422);
+            $service = app(OrderCorrections::class);
+            $this->pendingFingerprint = $service->fingerprint($service->snapshot($id));
             $this->order = (array) $o;
             foreach (['discount', 'delivery', 'courier'] as $field) {
                 $this->order[$field] = Money::input($o->$field);
@@ -306,7 +506,32 @@ class Admin extends Component
     {
         $this->validateMoneyFields(['order.discount', 'order.delivery', 'order.courier', ...array_map(fn ($index) => 'lines.'.$index.'.price', array_keys($this->lines))]);
         $this->validate(['order.customer' => 'required|string|max:255', 'order.phone' => 'required|string|max:40', 'order.address' => 'required|string|max:2000', 'order.ordered_on' => 'required|date_format:Y-m-d|before_or_equal:today', 'order.tracking' => 'nullable|string|max:255', 'order.notes' => 'nullable|string|max:5000', 'lines' => 'required|array|min:1|max:50', 'lines.*.quantity' => 'required|integer|min:1|max:10000', 'lines.*.product_id' => 'required|integer|exists:products,id', 'lines.*.price' => 'required', 'order.discount' => 'required', 'order.delivery' => 'required', 'order.courier' => 'required']);
-        $id = $ops->saveOrder($this->order, $this->lines, $this->requestKey, $this->editing);
+        $data = $this->order + ['customer_id' => null];
+        $data['save_customer'] = $this->saveCustomerProfile;
+        $data['confirm_distinct'] = $this->confirmDistinctCustomer;
+        $data['confirm_customer_change'] = $this->confirmCustomerChange;
+        $id = $ops->transaction(function () use ($ops, $data) {
+            if ($this->editing) {
+                $service = app(OrderCorrections::class);
+                if (! hash_equals($this->pendingFingerprint, $service->fingerprint($service->snapshot($this->editing)))) {
+                    throw ValidationException::withMessages(['operation' => 'Order changed. Reopen the form before saving.']);
+                }
+                $old = DB::table('orders')->find($this->editing);
+                foreach (['discount', 'delivery', 'courier'] as $field) {
+                    if (Money::parse($data[$field]) !== (int) $old->$field) {
+                        throw ValidationException::withMessages(['operation' => 'Use Edit Order to correct amounts with a reason and preview.']);
+                    }
+                }
+                $prices = DB::table('order_items')->where('order_id', $this->editing)->get()->groupBy('product_id');
+                foreach ($this->lines as $line) {
+                    if (isset($prices[$line['product_id']]) && ! $prices[$line['product_id']]->contains(fn ($item) => (int) $item->unit_price === Money::parse($line['price']))) {
+                        throw ValidationException::withMessages(['operation' => 'Use Edit Order to correct existing unit prices with a reason and preview.']);
+                    }
+                }
+            }
+
+            return $ops->saveOrder($data, $this->lines, $this->requestKey, $this->editing);
+        });
         $this->form = '';
         $this->viewOrder($id);
         $this->notice = 'Order saved and stock reserved.';
@@ -333,8 +558,15 @@ class Admin extends Component
         $this->validateMoneyFields(['courierInput']);
         $this->validate(['selected' => 'required|integer|exists:orders,id', 'trackingInput' => 'nullable|string|max:255', 'notesInput' => 'nullable|string|max:5000']);
         $cost = Money::parse($this->courierInput);
-        $ops->transaction(fn () => DB::table('orders')->where('id', $this->selected)->update(['courier' => $cost, 'tracking' => $this->trackingInput, 'notes' => $this->notesInput, 'updated_at' => now()]));
-        $this->notice = 'Courier cost, tracking and private notes updated. Issued invoices retain their snapshots.';
+        if ($cost !== (int) DB::table('orders')->where('id', $this->selected)->value('courier')) {
+            $this->editAmounts($this->selected);
+            $this->amountEdit['courier'] = Money::input($cost);
+            $this->notice = 'Enter a correction reason and preview the courier change. Tracking and notes have not been saved.';
+
+            return;
+        }
+        $ops->transaction(fn () => DB::table('orders')->where('id', $this->selected)->update(['tracking' => $this->trackingInput, 'notes' => $this->notesInput, 'updated_at' => now()]));
+        $this->notice = 'Tracking and private notes updated.';
     }
 
     public function fulfil(string $status, Operations $ops): void
@@ -522,7 +754,7 @@ class Admin extends Component
         $selected = $this->selected ? DB::table('orders')->find($this->selected) : null;
         $bars = DB::table('orders')->where('status', 'Delivered')->whereBetween('delivered_on', [$from, $to])->select('delivered_on')->selectRaw('SUM(total) revenue')->groupBy('delivered_on')->orderBy('delivered_on')->get();
 
-        return view('livewire.admin', ['packSummary' => $reports->packs($from, $to), 'breakdownRows' => $this->form === 'breakdown' ? $reports->breakdown($this->breakdownKind, $from, $to) : null, 'summary' => $reports->summary($from, $to), 'orders' => $query->orderByDesc('o.id')->paginate($this->page === 'dashboard' ? 4 : 12), 'products' => DB::table('products')->orderBy('name')->get(), 'batches' => $reports->batches($from, $to), 'selectedOrder' => $selected, 'items' => $selected ? DB::table('order_items')->where('order_id', $selected->id)->get() : collect(), 'allocations' => $selected ? $ops->allocations($selected->id) : collect(), 'receipts' => $selected ? DB::table('receipts')->where('order_id', $selected->id)->orderBy('id')->get() : collect(), 'netPaid' => $selected ? $ops->paid($selected->id) : 0, 'issued' => $selected ? DB::table('invoices')->where('order_id', $selected->id)->orderByDesc('version')->get() : collect(), 'bars' => $bars, 'statuses' => DB::table('orders')->whereBetween('ordered_on', [$from, $to])->select('status')->selectRaw('COUNT(*) count')->groupBy('status')->pluck('count', 'status'), 'dispatchCount' => DB::table('orders')->where('status', 'Pending')->count()])->layout('layouts.app', ['page' => $this->page]);
+        return view('livewire.admin', ['customers' => (new Customers)->listing($this->search)->orderBy('c.name')->orderBy('c.id')->paginate(12, pageName: 'customersPage'), 'customerMatches' => mb_strlen($this->customerSearch) >= 2 ? (new Customers)->listing(trim($this->customerSearch))->orderBy('c.name')->orderBy('c.id')->limit(8)->get() : collect(), 'customerOrders' => $this->customerId ? (new Reports)->balances()->where('o.customer_id', $this->customerId)->orderByDesc('o.id')->paginate(10, pageName: 'customerOrdersPage') : null, 'topCustomers' => (new Customers)->rankings($from, $to), 'packSummary' => $reports->packs($from, $to), 'breakdownRows' => $this->form === 'breakdown' ? $reports->breakdown($this->breakdownKind, $from, $to) : null, 'summary' => $reports->summary($from, $to), 'orders' => $query->orderByDesc('o.id')->paginate($this->page === 'dashboard' ? 4 : 25), 'products' => DB::table('products')->orderBy('name')->get(), 'batches' => $reports->batches($from, $to), 'selectedOrder' => $selected, 'items' => $selected ? DB::table('order_items')->where('order_id', $selected->id)->get() : collect(), 'allocations' => $selected ? $ops->allocations($selected->id) : collect(), 'receipts' => $selected ? DB::table('receipts')->where('order_id', $selected->id)->orderBy('id')->get() : collect(), 'netPaid' => $selected ? $ops->paid($selected->id) : 0, 'issued' => $selected ? DB::table('invoices')->where('order_id', $selected->id)->orderByDesc('version')->get() : collect(), 'bars' => $bars, 'statuses' => DB::table('orders')->whereBetween('ordered_on', [$from, $to])->select('status')->selectRaw('COUNT(*) count')->groupBy('status')->pluck('count', 'status'), 'dispatchCount' => DB::table('orders')->where('status', 'Pending')->count()])->layout('layouts.app', ['page' => $this->page]);
     }
 
     private function validateMoneyFields(array $fields): void

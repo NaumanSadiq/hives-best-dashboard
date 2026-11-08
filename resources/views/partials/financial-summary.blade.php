@@ -12,7 +12,7 @@
 <dl class="metric-calculation">
 @if($kind==='sales')<div><dt>Products after discounts</dt><dd>{{ $money($summary['merchandise']) }}</dd></div><div><dt>+ Delivery charged</dt><dd>{{ $money($summary['delivery']) }}</dd></div>
 @elseif($kind==='cash')<div><dt>Customer payments</dt><dd>{{ $money($summary['received_cash']) }}</dd></div><div><dt>− Refunds recorded</dt><dd>{{ $money($summary['refunded_cash']) }}</dd></div>
-@elseif($kind==='pending')<div><dt>Active order totals</dt><dd>{{ $money($summary['active_total']) }}</dd></div><div><dt>− Net payments on those orders</dt><dd>{{ $money($summary['active_paid']) }}</dd></div>
+@elseif($kind==='pending')<div><dt>Active order totals</dt><dd>{{ $money($summary['active_total']) }}</dd></div><div><dt>− Payments applied, capped per order</dt><dd>{{ $money($summary['active_applied']) }}</dd></div>
 @elseif($kind==='investment')@foreach(['purchase'=>'Purchase','packaging'=>'+ Packaging','branding'=>'+ Branding','other'=>'+ Other direct costs'] as $field=>$label)<div><dt>{{ $label }}</dt><dd>{{ $money($summary['investment_'.$field]) }}</dd></div>@endforeach
 @else<div><dt>Delivered sales revenue</dt><dd>{{ $money($summary['revenue']) }}</dd></div><div><dt>− Product cost, including allocated packaging and branding</dt><dd>{{ $money($summary['cost']) }}</dd></div><div><dt>− Actual courier costs</dt><dd>{{ $money($summary['courier']) }}</dd></div>@endif
 <div class="calculation-result"><dt>= {{ $title }}</dt><dd>{{ $money($summary[$value]) }}</dd></div></dl>

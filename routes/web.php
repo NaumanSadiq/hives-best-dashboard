@@ -12,7 +12,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', 'can:admin'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/', Admin::class)->name('dashboard');
-    foreach (['orders', 'stock'] as $page) {
+    foreach (['orders', 'stock', 'customers'] as $page) {
         Route::get('/'.$page, Admin::class)->defaults('page', $page)->name($page);
     }
     Route::get('/reports', fn () => redirect()->route('dashboard', request()->only('from', 'to')))->name('reports');
