@@ -131,7 +131,7 @@ class Customers
         $balances = (new Reports)->balances()->where('o.status', '!=', 'Cancelled')->select('o.customer_id')->selectRaw('SUM(CASE WHEN o.total>COALESCE(p.paid,0) THEN o.total-COALESCE(p.paid,0) ELSE 0 END) outstanding')->groupBy('o.customer_id');
         $query = DB::table('customers as c')->leftJoinSub($orders, 's', 's.customer_id', '=', 'c.id')->leftJoinSub($payments, 'r', 'r.customer_id', '=', 'c.id')->leftJoinSub($balances, 'b', 'b.customer_id', '=', 'c.id')->select('c.*', 's.latest_order')->selectRaw('COALESCE(s.total_orders,0) total_orders, COALESCE(s.delivered_orders,0) delivered_orders, COALESCE(s.cancelled_orders,0) cancelled_orders, COALESCE(r.net_paid,0) net_paid, COALESCE(b.outstanding,0) outstanding');
         if ($search !== '') {
-            $digits = preg_replace('/\D/', '', $search);
+            $digits = preg_match('/^[+\d\s().-]+$/', $search) ? preg_replace('/\D/', '', $search) : '';
             $phoneSearch = self::phone($search) ?? (str_starts_with($digits, '00') ? substr($digits, 2) : (str_starts_with($digits, '0') ? '92'.substr($digits, 1) : $digits));
             $query->where(fn ($q) => $q->where('c.name', 'like', '%'.$search.'%')->orWhere('c.phone', 'like', '%'.$search.'%')->when($digits !== '', fn ($q) => $q->orWhere('c.normalized_phone', 'like', '%'.$phoneSearch.'%')));
         }

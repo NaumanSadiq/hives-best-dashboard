@@ -1,4 +1,5 @@
 <?php
+
 use App\Services\Operations;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
@@ -9,8 +10,8 @@ use Illuminate\Validation\ValidationException;
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
-config(['database.connections.mysql.database' => 'hives_best_qa']);
-DB::purge('mysql');
+require_once __DIR__.'/qa-database.php';
+useBrowserQaDatabase('hives_best_qa');
 
 if (($argv[1] ?? '') === 'prepare') {
     $pool = 'concurrency-'.Str::lower(Str::random(8));

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Livewire\Admin;
+use App\Services\Operations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -16,6 +17,9 @@ Route::middleware(['auth', 'can:admin'])->group(function () {
         Route::get('/'.$page, Admin::class)->defaults('page', $page)->name($page);
     }
     Route::get('/reports', fn () => redirect()->route('dashboard', request()->only('from', 'to')))->name('reports');
+    Route::post('/orders/{id}/invoice', function (int $id) {
+        return redirect()->route('invoice', app(Operations::class)->issueInvoice($id));
+    })->whereNumber('id')->name('invoice.issue');
     Route::get('/invoices/{id}', function (int $id) {
         $invoice = DB::table('invoices')->find($id);
         abort_unless($invoice, 404);

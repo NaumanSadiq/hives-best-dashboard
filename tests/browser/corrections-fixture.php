@@ -8,8 +8,8 @@ use Illuminate\Support\Str;
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
-config(['database.connections.mysql.database' => 'hives_best_qa']);
-DB::purge('mysql');
+require_once __DIR__.'/qa-database.php';
+useBrowserQaDatabase('hives_best_qa');
 if (($argv[1] ?? '') === 'inspect') {
     $id = (int) $argv[2];
     echo json_encode(['batch' => DB::table('batches')->find($id), 'changes' => DB::table('batch_changes')->where('batch_id', $id)->get(), 'allocations' => DB::table('allocations')->where('batch_id', $id)->get(), 'invoice' => DB::table('invoices')->find((int) $argv[3])->snapshot]);

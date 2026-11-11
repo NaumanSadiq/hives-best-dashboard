@@ -21,8 +21,8 @@ if ($mode === 'prepare') {
     $fixture = json_decode(file_get_contents($path), true);
     $database = $fixture['database'];
 }
-config(['database.connections.mysql.database' => $database]);
-DB::purge('mysql');
+require_once __DIR__.'/qa-database.php';
+useBrowserQaDatabase($database);
 if ($mode === 'worker') {
     $payload = json_decode(file_get_contents(dirname(__DIR__, 2).'/storage/app/qa/savings-race.json'), true);
     try {
@@ -45,7 +45,7 @@ if ($mode === 'race') {
     exit;
 }
 if ($mode === 'inspect') {
-    echo json_encode(['savings' => (new Savings)->state(), 'entries' => DB::table('savings_entries')->count(), 'corrections' => DB::table('order_corrections')->count(), 'receipts' => DB::table('receipts')->count(), 'invoices' => DB::table('invoices')->count()]);
+    echo json_encode(['database' => DB::selectOne('select database() db')->db, 'savings' => (new Savings)->state(), 'entries' => DB::table('savings_entries')->count(), 'corrections' => DB::table('order_corrections')->count(), 'receipts' => DB::table('receipts')->count(), 'invoices' => DB::table('invoices')->count()]);
     exit;
 }
 Artisan::call('migrate', ['--force' => true]);
@@ -72,5 +72,5 @@ for ($i = 0; $i < 28; $i++) {
 }
 $ops->issueInvoice($ids[0]);
 $fixture = ['database' => $database, 'order' => $ids[0], 'number' => DB::table('orders')->find($ids[0])->number];
-file_put_contents($path,json_encode($fixture));
+file_put_contents($path, json_encode($fixture));
 echo json_encode($fixture);

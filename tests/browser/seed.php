@@ -1,4 +1,5 @@
 <?php
+
 use App\Models\User;
 use App\Services\Operations;
 use Illuminate\Contracts\Console\Kernel;
@@ -13,8 +14,8 @@ $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
 DB::statement('CREATE DATABASE IF NOT EXISTS hives_best_qa CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-config(['database.connections.mysql.database' => 'hives_best_qa']);
-DB::purge('mysql');
+require_once __DIR__.'/qa-database.php';
+useBrowserQaDatabase('hives_best_qa');
 Artisan::call('migrate', ['--force' => true]);
 if (DB::table('users')->exists()) {
     echo 'QA already prepared.'.PHP_EOL;

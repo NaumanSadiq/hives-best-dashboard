@@ -1,0 +1,35 @@
+.dashboard-tabs{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:18px}
+.current-balances{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-bottom:18px;align-items:start}
+.current-balances .panel{padding:20px;margin:0!important;min-width:0;height:auto}
+.current-balances .panel-heading{gap:12px;align-items:start;flex-wrap:wrap;margin-bottom:8px}
+.current-balances h2{font-size:1rem;margin-bottom:8px}
+.current-balances .btn{min-height:36px}
+.current-balances .savings-card .h4{font-size:1.7rem;display:inline-block;margin:0 6px 6px 0}
+.current-balances .small{line-height:1.45}
+.current-stock-pools{display:grid;gap:10px}
+.current-stock-pool{display:grid;gap:4px;padding-top:10px;border-top:1px solid var(--line);font-size:.9rem}
+.current-stock-pool>span{line-height:1.5}
+#pane-overview .financial-grid{gap:16px;margin-bottom:18px}
+#pane-overview .financial-card{padding:18px;border-radius:22px}
+#pane-overview .financial-card header{gap:8px;margin-bottom:8px}
+#pane-overview .financial-card h2{font-size:1rem}
+#pane-overview .metric-amount{font-size:1.5rem;margin-bottom:6px}
+#pane-overview .financial-card p{font-size:.88rem;line-height:1.45;margin-bottom:8px}
+#pane-overview .metric-calculation{margin:4px 0 12px;padding-top:6px}
+#pane-overview .metric-calculation>div{gap:10px;padding:5px 0}
+#pane-overview .metric-calculation dt{font-size:.82rem;max-width:60%}
+#pane-overview .metric-calculation dd{font-size:.85rem}
+#pane-overview .financial-card footer{gap:8px;flex-wrap:wrap}
+#pane-overview .financial-card footer .btn{padding:7px 10px;min-height:36px}
+#pane-overview .financial-card .metric-note{font-size:.8rem;padding:8px 10px}
+#pane-overview .pack-summary{padding:20px;margin-bottom:0}
+#pane-overview .pack-totals{margin:14px 0;gap:14px}
+#pane-overview .pack-totals dd{font-size:1.4rem;margin-bottom:0}
+#pane-overview .weight-calculation{padding:9px 12px;margin-bottom:10px}
+#pane-overview .pack-summary>.muted{font-size:.85rem;line-height:1.45}
+#pane-charts .charts-grid{margin-bottom:18px}
+#pane-charts .orders-panel{padding:20px}
+#pane-charts .order-list-entry{padding-bottom:8px}
+#pane-charts .order-row{padding-top:12px;padding-bottom:8px}
+@media(min-width:1200px){#pane-overview .financial-grid{grid-template-columns:repeat(3,minmax(0,1fr))}#pane-overview .financial-card:last-child{grid-column:span 2}}
+@media(max-width:767px){.dashboard-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-tabs .nav-link:last-child{grid-column:1/-1}.current-balances{grid-template-columns:1fr;gap:14px}.current-balances .panel{padding:18px}.current-balances .btn{min-height:40px}#pane-overview .financial-card footer{flex-direction:row;align-items:center}#pane-overview .financial-card footer span{max-width:55%}#pane-charts .orders-panel{padding:16px}.order-amounts{display:flex;flex-direction:column;gap:4px}.order-amounts>span{display:flex;justify-content:space-between;gap:12px}.order-amounts strong{font-size:.85rem}.order-amounts small{font-size:.8rem}}

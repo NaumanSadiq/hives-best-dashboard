@@ -1,6 +1,9 @@
 import * as bootstrap from 'bootstrap';
 import './controls';
+import './listings';
+import './admin-tables';
 import { toBlob } from 'html-to-image';
+import { clipboardCapability, clipboardFailure } from './invoice-clipboard';
 window.bootstrap = bootstrap;
 window.hiveDialog = () => ({
     previous: null,
@@ -24,24 +27,30 @@ async function prepareInvoice() {
     try {
         await document.fonts.ready;
         await Promise.all([...invoice.querySelectorAll('img')].map(img => img.decode()));
-        blob = await toBlob(invoice, { pixelRatio: 2, backgroundColor: '#fffaf0', skipFonts: true });
+        const width = invoice.offsetWidth;
+        const height = Math.max(invoice.offsetHeight, invoice.scrollHeight);
+        blob = await toBlob(invoice, {
+            width, height, pixelRatio: 2, backgroundColor: '#ffffff', skipFonts: true,
+        });
         if (!blob || blob.type !== 'image/png') throw new Error('PNG could not be prepared.');
         const url = URL.createObjectURL(blob);
         document.querySelector('#invoice-preview').src = url;
         download.href = url; download.download = `${invoice.dataset.number}.png`;
         download.classList.remove('disabled'); download.removeAttribute('aria-disabled');
-        status.textContent = 'PNG ready. Preview below shows the exact image you can copy or download.';
-        copy.disabled = !window.isSecureContext || !navigator.clipboard?.write || !window.ClipboardItem;
-        if (copy.disabled) status.textContent += ' Image clipboard is unavailable here; use Download PNG.';
+        const capability = clipboardCapability();
+        const readyMessage = 'PNG ready. Preview below shows the exact image you can copy or download.';
+        status.textContent = capability.available ? readyMessage : `${readyMessage} ${capability.reason}`;
+        copy.disabled = !capability.available;
+        copy.setAttribute('aria-describedby', 'invoice-status');
         copy.addEventListener('click', async () => {
             copy.disabled = true;
             try {
                 await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
                 status.textContent = 'Invoice image copied. You can now paste it into a supported chat.';
-            } catch (error) { status.textContent = 'Clipboard access was denied or is unavailable. Download PNG is ready.'; }
+            } catch (error) { status.textContent = clipboardFailure(error); }
             finally { copy.disabled = false; }
         });
-        download.addEventListener('click', () => { status.textContent = 'PNG download started.'; });
+        download.addEventListener('click', () => { status.textContent = `PNG download started.${capability.available ? '' : ' '+capability.reason}`; });
         window.addEventListener('pagehide', () => URL.revokeObjectURL(url), { once: true });
     } catch (error) { status.textContent = 'Could not prepare the invoice image. Reload this page to retry.'; }
 }

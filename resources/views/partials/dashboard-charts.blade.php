@@ -1,0 +1,10 @@
+<div class="dashboard-grid charts-grid"><section class="panel"><div class="panel-heading"><h2>Revenue Overview</h2><span class="mini-pill">By delivery date</span></div><p class="small muted">Delivered sales, including billed delivery</p>
+@if($bars->count())<div class="bar-chart" role="img" aria-label="Revenue by delivery date"><div class="chart-scale"><span>{{ $money($bars->max('revenue')) }}</span><span>0</span></div><div class="bar-scroll">@foreach($bars as $bar)<div class="bar-column"><span class="bar-bar" style="height:{{ max(3, $bar->revenue / max(1,$bars->max('revenue')) * 136) }}px" title="{{ $bar->delivered_on }}: {{ $money($bar->revenue) }}"></span><span>{{ \Carbon\Carbon::parse($bar->delivered_on)->format('d M') }}</span><span class="bar-amount">{{ $money($bar->revenue) }}</span></div>@endforeach</div></div>
+@else<div class="chart-empty"><i aria-hidden="true" class="bi bi-bar-chart-line"></i><strong>Good things are growing.</strong><span>Delivered orders will bring this chart to life.</span></div>@endif</section>
+<section class="panel"><div class="panel-heading"><h2>Order Status</h2><span class="mini-pill">By order date</span></div>
+@php($statusColors=['Pending'=>'#d9ad68','Dispatched'=>'#a18b76','Delivered'=>'#94ad8e','Cancelled'=>'#cf9980'])
+@php($totalStatus=max(1,$statuses->sum()))
+@php($cursor=0)
+@php($segments=[])
+@foreach($statusColors as $s=>$color) @php($end=$cursor+($statuses[$s]??0)/$totalStatus*100) @php($segments[]="$color {$cursor}% {$end}%") @php($cursor=$end) @endforeach
+<div class="status-chart"><div class="donut" style="background:{{ $statuses->sum() ? 'conic-gradient('.implode(',',$segments).')' : '#e6dfce' }}" role="img" aria-label="{{ $statuses->sum() }} orders by status"><div><strong>{{ $statuses->sum() }}</strong><span>orders</span></div></div><div class="chart-legend">@foreach($statusColors as $s=>$color)<div><span class="legend-dot" style="background:{{ $color }}"></span><a href="{{ route('orders', array_filter(['status'=>$s,'from'=>$appliedFrom,'to'=>$appliedTo])) }}">{{ $s }}</a><strong>{{ $statuses[$s]??0 }}</strong></div>@endforeach</div></div></section></div>

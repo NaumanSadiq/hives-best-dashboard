@@ -80,6 +80,14 @@ class CustomersTest extends TestCase
         $this->assertDatabaseCount('customers', 4);
     }
 
+    public function test_name_search_with_digits_does_not_match_unrelated_phones(): void
+    {
+        $this->order(['customer' => 'Buyer 0', 'phone' => '03331234560']);
+        $this->order(['customer' => 'Buyer 1', 'phone' => '03331234561']);
+        $this->assertEquals(['Buyer 0'], (new Customers)->listing('Buyer 0')->pluck('c.name')->all());
+        $this->assertSame(2, (new Customers)->listing('0333')->count());
+    }
+
     public function test_new_order_requests_are_idempotent_and_matching_phone_name_reuses_customer(): void
     {
         $key = (string) Str::uuid();
@@ -174,8 +182,22 @@ class CustomersTest extends TestCase
         for ($i = 0; $i < 27; $i++) {
             $this->order();
         }
-        Livewire::test(Admin::class, ['page' => 'orders'])->assertViewHas('orders', fn ($p) => $p->perPage() === 25 && $p->total() === 27)->set('search', 'Neadi')->call('setPage', 2)->assertViewHas('orders', fn ($p) => $p->count() === 2)->set('status','Cancelled')->assertSet('paginators.page',1);
-        Livewire::withQueryParams(['tab' => 'customers'])->test(Admin::class)->assertSet('dashboardTab','customers')->set('from','2026-11-01')->call('filter')->assertSet('dashboardTab','customers')->call('clearDates')->assertSet('dashboardTab','customers')->call('selectDashboardTab','finance')->assertSet('dashboardTab','finance');
-        Livewire::withQueryParams([])->test(Admin::class)->assertSet('dashboardTab','overview');
+        Livewire::test(Admin::class, ['page' => 'orders'])->assertViewHas('orders', fn ($p) => $p->perPage() === 25 && $p->total() === 27)->set('search', 'Neadi')->call('setPage', 2)->assertViewHas('orders', fn ($p) => $p->count() === 2)->set('status', 'Cancelled')->assertSet('paginators.page', 1);
+        Livewire::withQueryParams(['tab' => 'customers'])->test(Admin::class)->assertSet('dashboardTab', 'customers')->set('from', '2026-11-01')->call('filter')->assertSet('dashboardTab', 'customers')->call('clearDates')->assertSet('dashboardTab', 'customers')->call('selectDashboardTab', 'finance')->assertSet('dashboardTab', 'finance');
+        Livewire::withQueryParams([])->test(Admin::class)->assertSet('dashboardTab', 'overview');
+    }
+
+    public function test_customer_pagination_uses_twenty_five_records_and_search_resets_page(): void
+    {
+        for ($i = 0; $i < 27; $i++) {
+            $this->order(['customer' => 'Customer '.$i, 'phone' => '0333555'.str_pad($i, 4, '0', STR_PAD_LEFT)]);
+        }
+        Livewire::test(Admin::class, ['page' => 'customers'])
+            ->assertViewHas('customers', fn ($rows) => $rows->perPage() === 25 && $rows->total() === 27)
+            ->call('setPage', 2, 'customersPage')
+            ->assertViewHas('customers', fn ($rows) => $rows->count() === 2)
+            ->set('search', 'Customer 26')
+            ->assertSet('paginators.customersPage', 1)
+            ->assertViewHas('customers', fn ($rows) => $rows->total() === 1);
     }
 }

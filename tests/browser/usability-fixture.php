@@ -8,8 +8,8 @@ use Illuminate\Support\Str;
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
-config(['database.connections.mysql.database' => 'hives_best_qa']);
-DB::purge('mysql');
+require_once __DIR__.'/qa-database.php';
+useBrowserQaDatabase('hives_best_qa');
 $ops = new Operations;
 $data = ['customer' => 'Usability QA', 'phone' => '03000000000', 'address' => 'Disposable QA address', 'ordered_on' => today()->subMonth()->toDateString(), 'discount' => '0', 'delivery' => '0', 'courier' => '0', 'tracking' => '', 'notes' => ''];
 if (($argv[1] ?? '') === 'active') {

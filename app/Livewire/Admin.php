@@ -266,7 +266,7 @@ class Admin extends Component
         $this->paymentFilter = in_array(request('payment'), ['Pending', 'Paid']) ? request('payment') : '';
         $this->paidOn = $this->actionDate = today()->toDateString();
         $this->paymentKey = (string) Str::uuid();
-        if (! in_array($this->dashboardTab, ['overview', 'finance', 'stock', 'customers'])) {
+        if (! in_array($this->dashboardTab, ['overview', 'charts', 'finance', 'stock', 'customers'])) {
             $this->dashboardTab = 'overview';
         }
         if ($page === 'customers' && ctype_digit((string) request('customer'))) {
@@ -276,7 +276,7 @@ class Admin extends Component
 
     public function selectDashboardTab(string $tab): void
     {
-        if (in_array($tab, ['overview', 'finance', 'stock', 'customers'])) {
+        if (in_array($tab, ['overview', 'charts', 'finance', 'stock', 'customers'])) {
             $this->dashboardTab = $tab;
         }
     }
@@ -599,7 +599,7 @@ class Admin extends Component
     {
         $this->validate(['selected' => 'required|integer|exists:orders,id']);
         $id = app(Operations::class)->issueInvoice($this->selected, $correct);
-        $this->redirectRoute('invoice', ['id' => $id]);
+        $this->notice = 'Invoice version issued. Use View Invoice to open it in a new tab.';
     }
 
     public function productForm(?int $id = null): void
@@ -753,8 +753,9 @@ class Admin extends Component
         }
         $selected = $this->selected ? DB::table('orders')->find($this->selected) : null;
         $bars = DB::table('orders')->where('status', 'Delivered')->whereBetween('delivered_on', [$from, $to])->select('delivered_on')->selectRaw('SUM(total) revenue')->groupBy('delivered_on')->orderBy('delivered_on')->get();
+        $latestInvoices = DB::table('invoices')->select('order_id')->selectRaw('MAX(id) invoice_id')->groupBy('order_id')->pluck('invoice_id', 'order_id');
 
-        return view('livewire.admin', ['customers' => (new Customers)->listing($this->search)->orderBy('c.name')->orderBy('c.id')->paginate(12, pageName: 'customersPage'), 'customerMatches' => mb_strlen($this->customerSearch) >= 2 ? (new Customers)->listing(trim($this->customerSearch))->orderBy('c.name')->orderBy('c.id')->limit(8)->get() : collect(), 'customerOrders' => $this->customerId ? (new Reports)->balances()->where('o.customer_id', $this->customerId)->orderByDesc('o.id')->paginate(10, pageName: 'customerOrdersPage') : null, 'topCustomers' => (new Customers)->rankings($from, $to), 'packSummary' => $reports->packs($from, $to), 'breakdownRows' => $this->form === 'breakdown' ? $reports->breakdown($this->breakdownKind, $from, $to) : null, 'summary' => $reports->summary($from, $to), 'orders' => $query->orderByDesc('o.id')->paginate($this->page === 'dashboard' ? 4 : 25), 'products' => DB::table('products')->orderBy('name')->get(), 'batches' => $reports->batches($from, $to), 'selectedOrder' => $selected, 'items' => $selected ? DB::table('order_items')->where('order_id', $selected->id)->get() : collect(), 'allocations' => $selected ? $ops->allocations($selected->id) : collect(), 'receipts' => $selected ? DB::table('receipts')->where('order_id', $selected->id)->orderBy('id')->get() : collect(), 'netPaid' => $selected ? $ops->paid($selected->id) : 0, 'issued' => $selected ? DB::table('invoices')->where('order_id', $selected->id)->orderByDesc('version')->get() : collect(), 'bars' => $bars, 'statuses' => DB::table('orders')->whereBetween('ordered_on', [$from, $to])->select('status')->selectRaw('COUNT(*) count')->groupBy('status')->pluck('count', 'status'), 'dispatchCount' => DB::table('orders')->where('status', 'Pending')->count()])->layout('layouts.app', ['page' => $this->page]);
+        return view('livewire.admin', ['latestInvoices' => $latestInvoices, 'customers' => (new Customers)->listing($this->search)->orderBy('c.name')->orderBy('c.id')->paginate(25, pageName: 'customersPage'), 'customerMatches' => mb_strlen($this->customerSearch) >= 2 ? (new Customers)->listing(trim($this->customerSearch))->orderBy('c.name')->orderBy('c.id')->limit(8)->get() : collect(), 'customerOrders' => $this->customerId ? (new Reports)->balances()->where('o.customer_id', $this->customerId)->orderByDesc('o.id')->paginate(10, pageName: 'customerOrdersPage') : null, 'topCustomers' => (new Customers)->rankings($from, $to), 'packSummary' => $reports->packs($from, $to), 'breakdownRows' => $this->form === 'breakdown' ? $reports->breakdown($this->breakdownKind, $from, $to) : null, 'summary' => $reports->summary($from, $to), 'orders' => ($this->page === 'dashboard' ? $query->orderByDesc('o.ordered_on')->orderByDesc('o.id')->limit(5)->get() : $query->orderByDesc('o.id')->paginate(25)), 'products' => DB::table('products')->orderBy('name')->get(), 'batches' => $reports->batches($from, $to), 'selectedOrder' => $selected, 'items' => $selected ? DB::table('order_items')->where('order_id', $selected->id)->get() : collect(), 'allocations' => $selected ? $ops->allocations($selected->id) : collect(), 'receipts' => $selected ? DB::table('receipts')->where('order_id', $selected->id)->orderBy('id')->get() : collect(), 'netPaid' => $selected ? $ops->paid($selected->id) : 0, 'issued' => $selected ? DB::table('invoices')->where('order_id', $selected->id)->orderByDesc('version')->get() : collect(), 'bars' => $bars, 'statuses' => DB::table('orders')->whereBetween('ordered_on', [$from, $to])->select('status')->selectRaw('COUNT(*) count')->groupBy('status')->pluck('count', 'status'), 'dispatchCount' => DB::table('orders')->where('status', 'Pending')->count()])->layout('layouts.app', ['page' => $this->page]);
     }
 
     private function validateMoneyFields(array $fields): void
