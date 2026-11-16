@@ -147,7 +147,7 @@ class BatchCorrectionsTest extends TestCase
         }
         Livewire::test(Admin::class, ['page' => 'orders'])->set('from', '2026-11-01')->assertSee($number)->call('filter')->assertDontSee($number)->call('clearDates')->assertSet('from', '')->assertSee($number)->set('to', '2026-10-01')->call('filter')->assertSee($number)->set('from', '2026-10-02')->call('filter')->assertHasErrors('to')->assertSee($number);
         Livewire::test(Admin::class)->assertSee('Business reconciliation')->assertSee('View Breakdown');
-        $this->get('/reports?from=2026-10-01&to=2026-10-03')->assertRedirect('/?from=2026-10-01&to=2026-10-03');
+        $this->get('/admin/reports?from=2026-10-01&to=2026-10-03')->assertRedirect('/admin/dashboard?from=2026-10-01&to=2026-10-03');
     }
 
     public function test_paisa_reconciles_when_corrected_stock_is_fully_dispatched_or_lost(): void
@@ -183,11 +183,11 @@ class BatchCorrectionsTest extends TestCase
         $data = $this->data();
         $data['original_quantity'] = 500;
         try {
-            (new BatchCorrections)->save($this->batch,$data,'Correct receipt quantity');
+            (new BatchCorrections)->save($this->batch, $data, 'Correct receipt quantity');
             $this->fail('Historical overlap ignored');
         } catch (ValidationException $e) {
-            $this->assertStringContainsString('666',$e->errors()['batch.original_quantity'][0]);
+            $this->assertStringContainsString('666', $e->errors()['batch.original_quantity'][0]);
         }
-        $this->assertDatabaseHas('batches',['original_quantity' => 10000, 'physical' => 10000]);
+        $this->assertDatabaseHas('batches', ['original_quantity' => 10000, 'physical' => 10000]);
     }
 }

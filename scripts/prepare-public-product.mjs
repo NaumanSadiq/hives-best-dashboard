@@ -1,0 +1,5 @@
+﻿import sharp from 'sharp';import {mkdir} from 'node:fs/promises';import {fileURLToPath} from 'node:url';
+const output=new URL('../public/images/public/',import.meta.url);await mkdir(output,{recursive:true});
+for(const [prefix,file]of[['honey-500g','honey-500g-square.png'],['honey-1kg','honey-1kg-square.jfif'],['ghee-1kg','desi-ghee-1kg.png']]){const input=fileURLToPath(new URL('../resources/media/'+file,import.meta.url)),metadata=await sharp(input).metadata();if(metadata.width!==1254||metadata.height!==1254)throw Error('Unexpected source dimensions: '+file);for(const width of [640,960,1254])await sharp(input).resize(width,width,{fit:'inside',withoutEnlargement:true}).webp({quality:94,effort:6}).toFile(fileURLToPath(new URL(`${prefix}-${width}.webp`,output)));}
+await sharp(fileURLToPath(new URL('../resources/media/jar-silhouette-mask.png',import.meta.url))).resize(1254,1254).webp({quality:85,effort:6}).toFile(fileURLToPath(new URL('../resources/media/jar-silhouette-mask.webp',import.meta.url)));
+console.log('Prepared the three original product photographs and CSS silhouette mask.');
