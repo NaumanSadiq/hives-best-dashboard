@@ -29,7 +29,7 @@ body.welcome-page{margin:0}
  .showcase-jar{position:absolute;left:0;top:0;width:240px;height:calc(240px / .548);transform-origin:0 0;will-change:transform;pointer-events:none;filter:drop-shadow(0 8px 7px #5e3a1e20)}
  .showcase-jar[data-slot='0']{z-index:4}.showcase-jar[data-slot='1']{z-index:2}
  .jar-visual{width:100%;aspect-ratio:.548;position:relative;overflow:visible}.jar-visual img{position:absolute;left:-61%;top:-7.25%;width:222%;max-width:none;height:auto;mask-image:url('../../media/jar-silhouette-mask.webp');mask-mode:luminance;mask-size:100% 100%;mask-repeat:no-repeat;pointer-events:none}
- .stage-glow{position:absolute;inset:-8% -5% 0;background:radial-gradient(ellipse at 45% 42%,#fff2b5,transparent 66%);z-index:0;pointer-events:none;opacity:.7}
+ .stage-glow{position:absolute;inset:-8% -5% 0;background:radial-gradient(ellipse 44% 41% at 45% 42%,#fff2b5 0%,#fff2b500 98%);z-index:0;pointer-events:none;opacity:.7}
  .stage-shadow{position:absolute;left:12%;bottom:7%;width:44%;height:15px;border-radius:50%;background:#674420;opacity:.24;filter:blur(9px);z-index:1;transform-origin:center}
  .ingredient-layer{position:absolute;inset:0;z-index:1;pointer-events:none}.comb-photo{position:absolute;left:-2%;bottom:8%;width:31%;height:55%;object-fit:contain;rotate:-8deg;opacity:.95}.ghee-photo{position:absolute;left:0;bottom:7%;width:31%;height:59%;object-fit:contain;opacity:0}.honey-dipper{position:absolute;left:56%;top:5%;width:13%;height:60%;rotate:24deg;filter:drop-shadow(0 6px 5px #69421c26)}
  .ingredient-drop{position:absolute;width:11px;height:16px;background:#a36115;border-radius:80% 0 65% 65%;rotate:-40deg;opacity:.65}.drop-one{left:5%;top:16%}.drop-two{right:28%;bottom:9%;width:7px;height:11px}
@@ -91,7 +91,7 @@ body.welcome-page{margin:0}
 @media(min-width:700px) and (max-width:850px){.golden-page .featured-meta{min-height:84px}}
 
 .golden-page {
- .catalogue {padding-block:clamp(32px,4vw,60px)}
+ .catalogue {background:var(--ivory);padding-block:clamp(32px,4vw,60px)}
  .catalogue-rail {margin-top:24px;overflow:visible;grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr))}
  .catalogue-body h3 {margin-top:0;min-height:2.36em}
  .product-price {margin-top:8px;font-size:22px;font-weight:600;color:var(--green);white-space:nowrap}
@@ -113,16 +113,15 @@ body.welcome-page{margin:0}
  .closing{padding-top:32px}.closing-inner{display:flex;justify-content:space-between;align-items:center;gap:20px}.closing h2{margin:0}.closing-wave{margin-top:20px}
  .send-icon{width:26px;height:23px;position:relative;overflow:hidden}.send-icon svg{position:absolute;left:3px;top:2px}.send-icon svg+svg{transform:translate(-28px,16px)}.send-icon::before{content:'';position:absolute;left:4px;top:12px;width:17px;height:2px;background:#edb44b;transform:rotate(-32deg) scaleX(0)}
  .send-link:active{background:#3a6044}
- .catalogue-rail{gap:0;background:var(--ivory);border-radius:18px;padding:0;isolation:isolate}
+ .catalogue-rail{gap:0;background:transparent;padding:0;isolation:isolate}
  .catalogue-rail li{--delay:0ms;--light:#f4d590}.catalogue-rail li:nth-child(2){--delay:90ms;--light:#e9ac4d}.catalogue-rail li:nth-child(3){--delay:180ms;--light:#f6df71}
  .catalogue-card{border:0;background:transparent;border-radius:0;overflow:visible}
  .jar-preview{position:relative;isolation:isolate;height:298px;padding-bottom:3px}
- .jar-preview::before{content:'';position:absolute;inset:22% 7% 0;background:radial-gradient(ellipse at 50% 70%,var(--light),transparent 68%);opacity:.7;transform:scale(.9);transition:transform 650ms,opacity 650ms;pointer-events:none;z-index:-1}
+ .jar-preview::before{content:'';position:absolute;inset:12% 2% -3%;background:radial-gradient(ellipse 47% 43% at 50% 55%,var(--light) 0%,transparent 98%);opacity:.7;transform:scale(.9);transition:transform 650ms,opacity 650ms;pointer-events:none;z-index:-1}
  .jar-preview[aria-pressed=true]::before{transform:scale(1.1);opacity:1}
  .jar-landing{position:relative;z-index:2;display:block;transform-origin:center bottom}
  #product-500g .photo-stack{width:93px}
- .shelf-edge{position:absolute;bottom:0;left:0;right:0;height:1px;background:#bc853b;transform-origin:left}
- .shelf-shadow{position:absolute;bottom:0;width:112px;height:9px;border-radius:50%;background:#75501f42;filter:blur(4px);pointer-events:none}
+ .shelf-shadow{position:absolute;bottom:0;width:112px;height:9px;border-radius:50%;background:radial-gradient(ellipse 49% 47% at center,#75501f55,transparent 100%);filter:blur(2px);pointer-events:none}
  .catalogue-body{padding:16px clamp(14px,2vw,28px) 24px}.catalogue-body h3{min-height:0}.catalogue-body .pack-size{margin-top:5px}.product-price{margin-top:5px}
  @media(min-width:700px) and (max-width:1000px){.catalogue-body h3{min-height:2.36em}}
  @media(max-width:699px){
@@ -130,22 +129,19 @@ body.welcome-page{margin:0}
   .menu-toggle[aria-expanded=true] i{translate:0 0;transition:translate 140ms,rotate 140ms 140ms,opacity 100ms}.menu-toggle[aria-expanded=true] i:first-child{rotate:45deg}.menu-toggle[aria-expanded=true] i:last-child{rotate:-45deg}.menu-toggle[aria-expanded=true] i:nth-child(2){opacity:0}
   .public-header nav{top:100%;left:0;right:0}
   .closing-inner{align-items:flex-start;flex-direction:column;gap:14px}.closing{padding-top:26px}
-  .catalogue-rail{padding:0 10px}.catalogue-rail li{--delay:0ms!important}.catalogue-rail li+li{border-top:1px solid #d8c6a6}
+  .catalogue-rail{padding:0 10px}.catalogue-rail li{--delay:0ms!important}
   .catalogue-card{display:grid;grid-template-columns:46% 54%;align-items:center}.jar-preview{height:242px;padding-bottom:5px}.photo-stack{width:88px}#product-500g .photo-stack{width:76px}.catalogue-body{padding:12px}.catalogue-body h3{font-size:22px}.catalogue-body .pack-size{min-height:0}.pack-size span{display:block}.shelf-shadow{width:84px}
  }
  @media(max-width:359px){.catalogue-card{display:block}.jar-preview{height:218px}.catalogue-body{padding:12px 8px 17px}.pack-size span{display:inline}}
 }
 @media(prefers-reduced-motion:no-preference){
- .golden-page .jar-preview[data-arrival=waiting] .shelf-edge{transform:scaleX(0)}
  .golden-page [data-arrival=landing] .jar-landing{animation:hive-land 600ms cubic-bezier(.2,.7,.25,1) var(--delay) backwards}
  .golden-page [data-arrival=landing] .shelf-shadow{animation:hive-shadow 600ms ease-out var(--delay) backwards}
- .golden-page [data-arrival=landing] .shelf-edge{animation:hive-edge 240ms ease-out calc(var(--delay) * 2) backwards}
  .golden-page .send-link:focus-visible .send-icon svg:first-child{animation:hive-send 450ms both}.golden-page .send-link:focus-visible .send-icon svg+svg{animation:hive-replace 450ms both}.golden-page .send-link:focus-visible .send-icon::before{animation:hive-trail 450ms both}
  @media(hover:hover){.golden-page .send-link:hover .send-icon svg:first-child{animation:hive-send 450ms both}.golden-page .send-link:hover .send-icon svg+svg{animation:hive-replace 450ms both}.golden-page .send-link:hover .send-icon::before{animation:hive-trail 450ms both}}
 }
 @media(prefers-reduced-motion:reduce){.golden-page .jar-preview::before{transition:none}.golden-page .send-link:is(:hover,:focus-visible){background:#37583f}}
 @keyframes hive-land{from{transform:translateY(-18px) rotate(-2deg)}75%{transform:translateY(1px) rotate(.3deg)}to{transform:none}}
-@keyframes hive-edge{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes hive-shadow{from{opacity:.3;transform:scaleX(1.25)}to{opacity:1;transform:none}}
 @keyframes hive-send{0%{transform:none}25%{transform:rotate(-26deg)}70%,100%{transform:translate(28px,-18px) rotate(-30deg)}}
 @keyframes hive-replace{0%,47%{transform:translate(-28px,16px)}100%{transform:none}}

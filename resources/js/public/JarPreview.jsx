@@ -79,7 +79,7 @@ export default function JarPreview({product}) {
         onBlur={()=>preview(false)}
         onPointerDown={e=>{touch.current=e.pointerType==='touch';beforePress.current=desired.current;}}
         onClick={e=>preview(e.detail && touch.current ? !beforePress.current : !desired.current)}>
-        <span className="shelf-edge" aria-hidden="true"/><span className="jar-landing"><span className="photo-stack">
+        <span className="jar-landing"><span className="photo-stack">
             <span className="jar-base"><ProductPhoto product={product} decorative/></span>
             <img className="jar-neck" src={'/images/public/'+product.family+'-neck.webp'} alt=""/>
             <img className="jar-stream" src={'/images/public/'+product.family+'-ribbon.webp'} alt=""/>

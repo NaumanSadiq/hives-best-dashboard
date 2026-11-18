@@ -55,7 +55,8 @@ function Hero({order,onSelect,featured,onSettled}){
 const priceFormat = new Intl.NumberFormat('en-PK');
 
 function Collection() {
-    return <section className="catalogue layout" id="products" aria-labelledby="collection-title">
+    return <section className="catalogue" id="products" aria-labelledby="collection-title">
+        <div className="layout">
         <h2 id="collection-title">Our collection</h2>
         <ul className="catalogue-rail" aria-label="Products">
             {products.map(product => <li key={product.id}>
@@ -69,6 +70,7 @@ function Collection() {
                 </article>
             </li>)}
         </ul>
+        </div>
     </section>;
 }
 const questions=[
