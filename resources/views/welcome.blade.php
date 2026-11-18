@@ -7,7 +7,7 @@
     <meta name="description" content="Discover Hive’s Best raw wild dwarf honeybee honey and pure desi ghee. Three golden choices from our Jhelum-based brand. Explore and enquire at @hives_best.">
     <title>Hive’s Best · Raw Honey &amp; Pure Desi Ghee</title>
     <x-favicon />
-    <link rel="preload" as="image" href="{{ asset('images/public/honey-1kg-960.webp') }}" imagesrcset="/images/public/honey-1kg-640.webp 640w, /images/public/honey-1kg-960.webp 960w, /images/public/honey-1kg-1254.webp 1254w" imagesizes="(max-width: 759px) 88vw, (max-width: 1500px) 44vw, 580px" fetchpriority="high">
+    <link rel="preload" as="image" href="{{ asset('images/public/honey-1kg-960.webp') }}" imagesrcset="/images/public/honey-1kg-640.webp 640w, /images/public/honey-1kg-960.webp 960w, /images/public/honey-1kg-1254.webp 1254w" imagesizes="(max-width: 699px) 570px, (max-width: 1100px) 740px, 960px" fetchpriority="high">
     @viteReactRefresh
     @vite('resources/js/public/main.jsx')
 </head>
