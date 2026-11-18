@@ -94,7 +94,7 @@ body.welcome-page{margin:0}
  .catalogue {background:var(--ivory);padding-block:clamp(32px,4vw,60px)}
  .catalogue-rail {margin-top:24px;overflow:visible;grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr))}
  .catalogue-body h3 {margin-top:0;min-height:2.36em}
- .product-price {margin-top:8px;font-size:22px;font-weight:600;color:var(--green);white-space:nowrap}
+ .product-price {margin-top:8px;font-size:clamp(16px,1.3vw,18px);font-weight:600;color:var(--green);white-space:nowrap}
  .photo-stack {transform-origin:50% 100%}
  .jar-preview {height:292px;touch-action:pan-y pinch-zoom}
  .faq-layout {display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);align-items:start;gap:clamp(24px,4vw,60px)}
@@ -122,7 +122,7 @@ body.welcome-page{margin:0}
  .jar-landing{position:relative;z-index:2;display:block;transform-origin:center bottom}
  #product-500g .photo-stack{width:93px}
  .shelf-shadow{position:absolute;bottom:0;width:112px;height:9px;border-radius:50%;background:radial-gradient(ellipse 49% 47% at center,#75501f55,transparent 100%);filter:blur(2px);pointer-events:none}
- .catalogue-body{padding:16px clamp(14px,2vw,28px) 24px}.catalogue-body h3{min-height:0}.catalogue-body .pack-size{margin-top:5px}.product-price{margin-top:5px}
+ .catalogue-body{padding:16px clamp(14px,2vw,28px) 24px}.catalogue-body h3{min-height:0;font-size:clamp(19px,1.6vw,23px)}.catalogue-body .pack-size{margin-top:5px}.product-price{margin-top:5px}
  @media(min-width:700px) and (max-width:1000px){.catalogue-body h3{min-height:2.36em}}
  @media(max-width:699px){
   .menu-toggle{width:44px;height:44px;padding:0;align-items:center;justify-content:center;border:none;background:transparent}.burger{position:relative;width:22px;height:18px}.burger i{position:absolute;top:8px;left:0;width:22px;height:2px;background:currentColor;border-radius:2px;transition:translate 140ms 140ms,rotate 140ms,opacity 100ms}.burger i:first-child{translate:0 -7px}.burger i:last-child{translate:0 7px}
@@ -130,7 +130,7 @@ body.welcome-page{margin:0}
   .public-header nav{top:100%;left:0;right:0}
   .closing-inner{align-items:flex-start;flex-direction:column;gap:14px}.closing{padding-top:26px}
   .catalogue-rail{padding:0 10px}.catalogue-rail li{--delay:0ms!important}
-  .catalogue-card{display:grid;grid-template-columns:46% 54%;align-items:center}.jar-preview{height:242px;padding-bottom:5px}.photo-stack{width:88px}#product-500g .photo-stack{width:76px}.catalogue-body{padding:12px}.catalogue-body h3{font-size:22px}.catalogue-body .pack-size{min-height:0}.pack-size span{display:block}.shelf-shadow{width:84px}
+  .catalogue-card{display:grid;grid-template-columns:46% 54%;align-items:center}.jar-preview{height:242px;padding-bottom:5px}.photo-stack{width:88px}#product-500g .photo-stack{width:76px}.catalogue-body{padding:12px}.catalogue-body h3{font-size:19px}.catalogue-body .pack-size{min-height:0}.pack-size span{display:block}.shelf-shadow{width:84px}
  }
  @media(max-width:359px){.catalogue-card{display:block}.jar-preview{height:218px}.catalogue-body{padding:12px 8px 17px}.pack-size span{display:inline}}
 }
